@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local data — resume + AI profile (personal)
+data/
+
+# local SQLite database (contains user accounts, password hashes, preferences)
+local.db
+local.db-*
+*.sqlite
+*.sqlite-*
+
+# BC ("Before Claude") learning artifacts — bug answer key, keep local only
+.bc/
