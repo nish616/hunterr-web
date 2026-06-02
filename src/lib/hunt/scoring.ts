@@ -225,12 +225,12 @@ async function scoreOne(
         format: { type: "json_schema", schema: FIT_JSON_SCHEMA },
       },
       system: [
-        { type: "text", text: FIT_INSTRUCTIONS },
         {
           type: "text",
-          text: resumeContext,
+          text: FIT_INSTRUCTIONS,
           cache_control: { type: "ephemeral" },
         },
+        { type: "text", text: resumeContext },
       ],
       messages: [{ role: "user", content: jd }],
     } as unknown as Anthropic.MessageCreateParamsNonStreaming);
@@ -274,15 +274,9 @@ export async function scoreJobs(
   const total = jobs.length;
   onProgress?.({ type: "scoring", done: 0, total });
 
-  // Warm the cache sequentially with the first call.
-  const first = await scoreOne(client, resumeContext, jobs[0]);
-  scored.push(attach(jobs[0], first));
-  onProgress?.({ type: "scoring", done: scored.length, total });
-
-  // Process the rest with bounded concurrency.
-  const rest = jobs.slice(1);
-  for (let i = 0; i < rest.length; i += AI_MAX_CONCURRENCY) {
-    const batch = rest.slice(i, i + AI_MAX_CONCURRENCY);
+  // Process all jobs with bounded concurrency.
+  for (let i = 0; i < jobs.length; i += AI_MAX_CONCURRENCY) {
+    const batch = jobs.slice(i, i + AI_MAX_CONCURRENCY);
     const results = await Promise.all(
       batch.map((j) => scoreOne(client, resumeContext, j)),
     );

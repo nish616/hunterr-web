@@ -362,7 +362,7 @@ export async function runDeepDive({
 
       toolResults.push({
         type: "tool_result",
-        tool_use_id: block.id,
+        tool_use_id: block.name,
         content: outcome.content,
         is_error: !outcome.ok,
       });

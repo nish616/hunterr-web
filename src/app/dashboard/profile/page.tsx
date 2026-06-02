@@ -7,12 +7,19 @@ import { db, schema } from "@/lib/db";
 import type { UserPreferences } from "@/lib/db/schema";
 import { ProfileForm } from "./profile-form";
 
+
 export default async function ProfilePage() {
-  const session = await auth();
-  if (!session?.user) redirect("/signin");
+  let session;
+  try {
+    session = await auth();
+    if (!session?.user) redirect("/signin");
+  } catch (err) {
+    console.error("Auth check failed on /dashboard/profile:", err);
+    session = null;
+  }
 
   const row = await db.query.users.findFirst({
-    where: eq(schema.users.id, session.user.id),
+    where: eq(schema.users.id, session!.user.id),
     columns: { preferences: true },
   });
   const preferences: UserPreferences = row?.preferences ?? {};
@@ -60,7 +67,7 @@ export default async function ProfilePage() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">
-              {session.user.email}
+              {session!.user.email}
             </span>
             <form
               action={async () => {

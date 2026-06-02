@@ -471,8 +471,13 @@ function JobCard({
   pillClass: string;
   onDeepDive: () => void;
 }) {
+  // content-visibility:auto lets the browser skip layout/paint for offscreen
+  // cards. contain-intrinsic-size reserves space so the scrollbar doesn't jump
+  // as cards enter/leave the viewport (220px ≈ typical card height with AI
+  // strengths/gaps; matched-not-scored cards are shorter but the diff is small
+  // enough that the scrollbar settle is imperceptible).
   return (
-    <Card>
+    <Card className="[content-visibility:auto] [contain-intrinsic-size:auto_220px]">
       <CardHeader>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0 flex-1">
