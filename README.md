@@ -3,8 +3,9 @@
 An invite-only job-discovery system that combines an **AI workflow** for bulk
 crawling/scoring with an **agentic** deep dive for high-touch per-job analysis.
 Scans 85 company job boards, scores them against your resume, and on demand
-runs a Claude agent that researches the company and drafts a tailored cover
-letter.
+runs a Claude agent that researches the company, gap-analyses you against the
+JD, rewrites your resume bullets to fit, and drafts both a tailored cover
+letter and interview-prep questions.
 
 ![Hunterr dashboard with AI-scored job matches](public/screenshots/results.png)
 
@@ -21,12 +22,22 @@ Two AI surfaces, each chosen for what it's actually good at.
 
 **Per-job deep dive — an agent** (Claude in a tool-use loop, choosing what to do next):
 
-Click *Deep dive* on any scored job. The agent uses `web_search`, `fetch_url`,
-and `save_finding` over up to 10 turns to produce six grounded sections:
-company brief, tech stack reality check, deep gap analysis, tailored cover
-letter, resume bullet rewrites, and questions to ask the interviewer. Hard caps
-on searches, fetches, and iterations keep spend at ~$0.25 per dive. The agent
-skips sections it can't ground in fact rather than fabricating.
+Click *Deep dive* on any scored job. The agent has three tools — `web_search`,
+`fetch_url`, `save_finding` — and runs up to 10 turns to produce six grounded
+sections:
+
+- **Company brief** — what they do, stage/funding, recent news, leadership, red flags.
+- **Tech stack reality check** — what the engineering blog/careers page actually says they use, vs. what the JD claims.
+- **Deep gap analysis** — concrete overlaps and gaps between your resume and the JD, citing exact phrases from both.
+- **Tailored cover letter** — ~250 words, specific, no platitudes; references your linked GitHub/portfolio when relevant.
+- **Resume bullet rewrites** — which bullets to emphasize, drop, or reword for this JD, in before/after form.
+- **Questions to ask them** — 4–6 interviewer questions that show you did the research.
+
+The agent decides which sections to attempt based on what its tools surface
+and skips any section it can't ground in fact rather than fabricating. Hard
+caps on searches, fetches, and iterations keep spend at ~$0.25 per dive.
+Results stream live into the dashboard and persist per-job in Postgres, so
+reopening the panel shows the prior dive without re-running.
 
 The split: predictable, low-cost bulk discovery; high-touch per-job depth on
 demand.
@@ -103,12 +114,6 @@ src/
     agent/                     Agent: tool-use loop, tools, event stream
     db/                        Drizzle schema and Neon client
 ```
-
-## Deploy
-
-Push to GitHub, import on Vercel, set `DATABASE_URL`, `AUTH_SECRET`,
-`ANTHROPIC_API_KEY` (and optionally the Google CSE pair). Add a custom domain
-via CNAME.
 
 ## License
 
