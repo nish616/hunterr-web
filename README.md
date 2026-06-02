@@ -170,7 +170,7 @@ hunterr-web/
         runs/route.ts           Streaming hunt endpoint
     auth.config.ts              Edge-safe auth config (used by middleware)
     auth.ts                     Full auth config (DB lookup, bcrypt)
-    middleware.ts               Route protection for /dashboard
+    proxy.ts               Route protection for /dashboard
     components/ui/              shadcn/ui components
     lib/
       db/                       Drizzle schema and Neon client
