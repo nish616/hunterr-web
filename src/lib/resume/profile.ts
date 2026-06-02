@@ -1,31 +1,35 @@
 import Anthropic from "@anthropic-ai/sdk";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { AI_MODEL } from "@/lib/hunt/config";
-import { DATA_DIR, PROFILE_MD_PATH, RESUME_TXT_PATH } from "./paths";
+import { db, schema } from "@/lib/db";
 
-const PROFILE_SYSTEM_PROMPT = `You are an expert technical recruiter parsing an engineering resume.
-Extract a concise, structured profile that will be used to evaluate job-role fit.
+// Role-agnostic: works for engineers, designers, PMs, etc. Claude infers the
+// person's field from the résumé itself rather than us assuming engineering.
+const PROFILE_SYSTEM_PROMPT = `You are an expert recruiter parsing a candidate's resume.
+First infer the candidate's profession/field from the resume (e.g. software engineering, product design, product management, data, marketing).
+Then extract a concise, structured profile that will be used to evaluate job-role fit.
 Be accurate and grounded — do not invent skills or experience not present in the resume.
 Output clean Markdown with these sections, in order:
 
 ## Headline
-One sentence: name, current/most-recent role, years of experience.
+One sentence: name, current/most-recent role, field, and years of experience.
 
 ## Target Roles
-3-6 role titles this person is well-positioned for.
+3-6 role titles this person is well-positioned for, appropriate to their field.
 
 ## Core Skills
-Comma-separated list of the strongest 8-15 technical skills.
+Comma-separated list of their strongest 8-15 skills, tools, or competencies (whatever is central to their field — e.g. languages/frameworks for engineers, Figma/prototyping/research for designers).
 
 ## Secondary Skills
 Comma-separated list of additional skills they have working knowledge of.
 
 ## Experience Summary
-3-5 bullet points covering domains, scale, types of systems, and seniority signals.
+3-5 bullet points covering domains, scope/scale, types of work, and seniority signals.
 
 ## Likely Dealbreakers
-Bullet points of role characteristics that probably DON'T fit (e.g. "early-career-only roles", "no remote", "deep ML research roles" — only if the resume signals it).`;
+Bullet points of role characteristics that probably DON'T fit (e.g. "early-career-only roles", "no remote", "roles requiring a specialization they lack" — only if the resume signals it).`;
 
 async function resolveApiKey(): Promise<string | undefined> {
   const fromEnv = process.env.ANTHROPIC_API_KEY?.trim();
@@ -44,9 +48,10 @@ async function resolveApiKey(): Promise<string | undefined> {
 
 /**
  * Send resume text through Claude to produce a structured profile.
- * Saves both the raw text and the profile Markdown to data/.
+ * Saves both the raw text and the profile Markdown under the user's folder.
  */
 export async function profileAndSaveResume(
+  userId: string,
   resumeText: string,
 ): Promise<{ profileMd: string }> {
   if (!resumeText.trim()) {
@@ -76,24 +81,25 @@ export async function profileAndSaveResume(
     throw new Error("Claude returned no profile content.");
   }
 
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await Promise.all([
-    fs.writeFile(RESUME_TXT_PATH, resumeText, "utf-8"),
-    fs.writeFile(PROFILE_MD_PATH, profileMd, "utf-8"),
-  ]);
+  await db
+    .update(schema.users)
+    .set({ resumeText, resumeProfile: profileMd })
+    .where(eq(schema.users.id, userId));
 
   return { profileMd };
 }
 
-export async function loadCurrentProfile(): Promise<{
+export async function loadCurrentProfile(userId: string): Promise<{
   profileMd: string;
   resumeText: string;
   exists: boolean;
 }> {
-  const [profileMd, resumeText] = await Promise.all([
-    fs.readFile(PROFILE_MD_PATH, "utf-8").catch(() => ""),
-    fs.readFile(RESUME_TXT_PATH, "utf-8").catch(() => ""),
-  ]);
+  const row = await db.query.users.findFirst({
+    where: eq(schema.users.id, userId),
+    columns: { resumeText: true, resumeProfile: true },
+  });
+  const profileMd = row?.resumeProfile ?? "";
+  const resumeText = row?.resumeText ?? "";
   return {
     profileMd,
     resumeText,

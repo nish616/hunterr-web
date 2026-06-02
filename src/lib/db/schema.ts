@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { pgTable, text, timestamp, jsonb } from "drizzle-orm/pg-core";
 
 /**
  * Per-user preferences. Stored as JSON so we can add new keys (skills,
@@ -11,18 +11,19 @@ export interface UserPreferences {
   maxAgeDays?: number; // posting age cutoff; 0 = no limit. Overrides default.
 }
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   name: text("name"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  // JSON blob; empty / null = use defaults. Drizzle handles JSON.stringify/parse.
-  preferences: text("preferences", { mode: "json" }).$type<UserPreferences>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  // JSON blob; empty / null = use defaults.
+  preferences: jsonb("preferences").$type<UserPreferences>(),
+  // Résumé stored in the DB (not on disk) so it survives serverless deploys.
+  resumeText: text("resume_text"),
+  resumeProfile: text("resume_profile"),
 });
 
 export type User = typeof users.$inferSelect;

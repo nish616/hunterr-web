@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { runHunt } from "@/lib/hunt/pipeline";
-import type { FilterOverrides } from "@/lib/hunt/types";
+import type { FilterOverrides, HuntProgress } from "@/lib/hunt/types";
 
 // AI scoring + fetches can take 60-90s; raise the route timeout for local dev.
 // On Vercel Hobby the timeout is hard-capped at 60s, so we'd need to either
@@ -54,14 +54,38 @@ export async function POST(req: Request) {
     );
   }
 
-  try {
-    const result = await runHunt({ withAi, filters });
-    return NextResponse.json(result);
-  } catch (err) {
-    console.error("Hunt failed:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Hunt failed" },
-      { status: 500 },
-    );
-  }
+  // Stream progress events as newline-delimited JSON (NDJSON). The client reads
+  // each line and updates the live status; the final line carries the result.
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: HuntProgress) => {
+        controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+      };
+      try {
+        const result = await runHunt({
+          userId: session.user.id,
+          withAi,
+          filters,
+          onProgress: send,
+        });
+        send({ type: "result", result });
+      } catch (err) {
+        console.error("Hunt failed:", err);
+        send({
+          type: "error",
+          message: err instanceof Error ? err.message : "Hunt failed",
+        });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+    },
+  });
 }

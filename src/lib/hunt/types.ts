@@ -47,3 +47,19 @@ export interface RunResult {
   jobs: Job[];
   stats: RunStats;
 }
+
+/**
+ * Progress events streamed from the hunt pipeline to the client during a run.
+ * One JSON object per line (NDJSON).
+ */
+export type HuntProgress =
+  | { type: "fetching"; companies: number }
+  | { type: "fetched"; count: number }
+  | { type: "filtering" }
+  | { type: "filtered"; count: number }
+  | { type: "reading_resume" }
+  | { type: "scoring"; done: number; total: number }
+  | { type: "result"; result: RunResult }
+  | { type: "error"; message: string };
+
+export type ProgressCallback = (event: HuntProgress) => void;

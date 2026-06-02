@@ -1,8 +1,18 @@
 import { fetchAll } from "./fetchers";
 import { filterAndRank } from "./filter";
 import { scoreJobs } from "./scoring";
-import { AI_MAX_JOBS_PER_RUN } from "./config";
-import type { FilterOverrides, Job, RunResult } from "./types";
+import { AI_MAX_JOBS_PER_RUN, ATS_CONFIG } from "./config";
+import type {
+  FilterOverrides,
+  Job,
+  ProgressCallback,
+  RunResult,
+} from "./types";
+
+const TOTAL_COMPANIES =
+  ATS_CONFIG.greenhouse.length +
+  ATS_CONFIG.lever.length +
+  ATS_CONFIG.ashby.length;
 
 const VERDICT_RANK = { strong: 3, stretch: 2, skip: 1 } as const;
 
@@ -19,21 +29,31 @@ function rank(jobs: Job[]): Job[] {
   });
 }
 
-export async function runHunt(options?: {
+export async function runHunt(options: {
+  userId: string;
   withAi?: boolean;
   filters?: FilterOverrides;
+  onProgress?: ProgressCallback;
 }): Promise<RunResult> {
   const t0 = Date.now();
-  const withAi = options?.withAi ?? true;
+  const withAi = options.withAi ?? true;
+  const onProgress = options.onProgress;
 
+  onProgress?.({ type: "fetching", companies: TOTAL_COMPANIES });
   const { jobs: fetched, failures } = await fetchAll();
+  onProgress?.({ type: "fetched", count: fetched.length });
+
+  onProgress?.({ type: "filtering" });
   const matched = filterAndRank(fetched, options?.filters);
+  onProgress?.({ type: "filtered", count: matched.length });
+
   const limited = matched.slice(0, AI_MAX_JOBS_PER_RUN);
 
   let scoredJobs: Job[] = limited;
   let totalScored = 0;
   if (withAi && limited.length > 0) {
-    scoredJobs = await scoreJobs(limited);
+    onProgress?.({ type: "reading_resume" });
+    scoredJobs = await scoreJobs(limited, options.userId, onProgress);
     totalScored = scoredJobs.filter((j) => j.aiScore !== undefined).length;
   }
 

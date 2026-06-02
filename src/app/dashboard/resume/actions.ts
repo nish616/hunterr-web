@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { extractResumeText } from "@/lib/resume/extract";
 import { profileAndSaveResume } from "@/lib/resume/profile";
@@ -45,7 +44,7 @@ export async function uploadResumeAction(
         message: `Extracted only ${text.length} characters from the file — that's suspiciously short. Make sure the file isn't a scanned image.`,
       };
     }
-    const { profileMd } = await profileAndSaveResume(text);
+    const { profileMd } = await profileAndSaveResume(session.user.id, text);
     return {
       status: "success",
       message: `Resume updated (${text.length.toLocaleString()} chars extracted).`,

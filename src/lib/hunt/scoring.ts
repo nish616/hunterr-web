@@ -2,8 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import type { Job, Verdict } from "./types";
+import { eq } from "drizzle-orm";
+import type { Job, ProgressCallback, Verdict } from "./types";
 import { AI_MODEL, AI_MAX_CONCURRENCY } from "./config";
+import { db, schema } from "@/lib/db";
 
 export const FitAnalysisSchema = z.object({
   fit_score: z.number().int().min(1).max(10),
@@ -30,18 +32,22 @@ const FIT_JSON_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+// Role-agnostic — works for any field (engineering, design, product, data, etc.).
+// Claude infers the candidate's profession from their résumé/profile and judges
+// fit against the JD's actual requirements, whatever the discipline.
 const FIT_INSTRUCTIONS = `You are evaluating how well a single job description fits a specific candidate based on their resume and profile.
-Be honest and concise. Reward concrete skill overlap and relevant scale. Penalize roles that demand expertise the candidate lacks.
+First infer the candidate's profession/field from their profile, then judge fit against this role's actual requirements for that field.
+Be honest and concise. Reward concrete overlap between the candidate's experience and the role's requirements. Penalize roles that demand expertise the candidate lacks.
 
 When grading, weigh these signals in order of importance:
-- Hard eligibility: location, work authorization, and visa requirements often disqualify before skills do — treat geofenced "Remote" roles (Remote - US, Remote - Canada, etc.) as likely barriers if the candidate is based elsewhere.
-- Seniority calibration: years of experience and current title matter; missing 1-2 years for a senior role is a stretch, missing 4+ is usually a skip. A Software Engineer II applying to Staff+ roles is almost always a skip unless their impact narrative is exceptional.
-- Skill overlap: alignment on the JD's core stack outweighs adjacent tooling. Distinguish must-haves from nice-to-haves — a missing must-have is usually a deal-breaker; a missing nice-to-have rarely is.
-- Domain context: prior experience in the JD's domain (fintech, devtools, security, ML infra, etc.) is a meaningful differentiator. Absence is a soft gap, not a hard one, unless the role is explicitly domain-led.
+- Hard eligibility: location, work authorization, and visa requirements often disqualify before fit does — treat geofenced "Remote" roles (Remote - US, Remote - Canada, etc.) as likely barriers if the candidate is based elsewhere.
+- Seniority calibration: years of experience and current level matter; missing 1-2 years for a senior role is a stretch, missing 4+ is usually a skip. Applying significantly above one's current level (e.g. to a Staff / Principal / Lead / Head-of role) is almost always a skip unless the impact narrative is exceptional.
+- Requirement overlap: alignment on the role's core required skills, tools, or competencies outweighs adjacent ones. Distinguish must-haves from nice-to-haves — a missing must-have is usually a deal-breaker; a missing nice-to-have rarely is. (For engineers this is the tech stack; for designers it's tools like Figma plus competencies like user research, design systems, prototyping; judge by what THIS role actually requires.)
+- Domain context: prior experience in the role's domain (fintech, devtools, healthcare, consumer, etc.) is a meaningful differentiator. Absence is a soft gap, not a hard one, unless the role is explicitly domain-led.
 
 A "strong" verdict means the candidate is well-positioned, the eligibility checks pass, and they should apply with high confidence.
 A "stretch" verdict means it's worth applying but with notable gaps the candidate will need to address in cover-letter framing.
-A "skip" verdict means the role likely isn't a good use of time — hard eligibility issues, deep stack mismatch, or significant seniority gap.
+A "skip" verdict means the role likely isn't a good use of time — hard eligibility issues, deep requirement mismatch, or significant seniority gap.
 
 Be specific in strengths and gaps — point to concrete claims in the resume and concrete requirements in the JD, not generic praise or hedging. Quote exact phrases where useful.`;
 
@@ -65,15 +71,16 @@ async function resolveApiKey(): Promise<string | undefined> {
   }
 }
 
-async function loadResumeContext(): Promise<string> {
-  const dataDir = path.join(process.cwd(), "data");
-  const [profile, resume] = await Promise.all([
-    fs.readFile(path.join(dataDir, "profile.md"), "utf-8").catch(() => ""),
-    fs.readFile(path.join(dataDir, "resume.txt"), "utf-8").catch(() => ""),
-  ]);
+async function loadResumeContext(userId: string): Promise<string> {
+  const row = await db.query.users.findFirst({
+    where: eq(schema.users.id, userId),
+    columns: { resumeText: true, resumeProfile: true },
+  });
+  const profile = row?.resumeProfile ?? "";
+  const resume = row?.resumeText ?? "";
   if (!profile && !resume) {
     throw new Error(
-      "No resume found. Add data/resume.txt and data/profile.md.",
+      "No résumé found for your account. Upload one on the Résumé page first.",
     );
   }
   return `## Candidate Profile (structured)\n\n${profile}\n\n## Candidate Resume (raw)\n\n${resume}`;
@@ -133,10 +140,14 @@ async function scoreOne(
  * Score jobs with Claude. Warms the cache with one sequential call,
  * then runs the rest with bounded concurrency.
  */
-export async function scoreJobs(jobs: Job[]): Promise<Job[]> {
+export async function scoreJobs(
+  jobs: Job[],
+  userId: string,
+  onProgress?: ProgressCallback,
+): Promise<Job[]> {
   if (jobs.length === 0) return [];
 
-  const resumeContext = await loadResumeContext();
+  const resumeContext = await loadResumeContext(userId);
   const apiKey = await resolveApiKey();
   if (!apiKey) {
     throw new Error(
@@ -145,10 +156,13 @@ export async function scoreJobs(jobs: Job[]): Promise<Job[]> {
   }
   const client = new Anthropic({ apiKey });
   const scored: Job[] = [];
+  const total = jobs.length;
+  onProgress?.({ type: "scoring", done: 0, total });
 
   // Warm the cache sequentially with the first call.
   const first = await scoreOne(client, resumeContext, jobs[0]);
   scored.push(attach(jobs[0], first));
+  onProgress?.({ type: "scoring", done: scored.length, total });
 
   // Process the rest with bounded concurrency.
   const rest = jobs.slice(1);
@@ -158,6 +172,7 @@ export async function scoreJobs(jobs: Job[]): Promise<Job[]> {
       batch.map((j) => scoreOne(client, resumeContext, j)),
     );
     results.forEach((r, idx) => scored.push(attach(batch[idx], r)));
+    onProgress?.({ type: "scoring", done: scored.length, total });
   }
 
   return scored;

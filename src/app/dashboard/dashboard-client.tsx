@@ -13,7 +13,22 @@ import {
 import { cn } from "@/lib/utils";
 import { ATS_CONFIG } from "@/lib/hunt/config";
 import type { UserPreferences } from "@/lib/db/schema";
-import type { Job, RunResult, Source, Verdict } from "@/lib/hunt/types";
+import type {
+  HuntProgress,
+  Job,
+  RunResult,
+  Source,
+  Verdict,
+} from "@/lib/hunt/types";
+
+type ProgressState = {
+  stageIndex: number; // 0 fetch · 1 filter · 2 resume · 3 score
+  companies: number;
+  fetched: number | null;
+  matched: number | null;
+  scoreDone: number | null;
+  scoreTotal: number | null;
+};
 
 function parseList(text: string | undefined): string[] {
   if (!text) return [];
@@ -99,6 +114,7 @@ export function DashboardClient({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+  const [progress, setProgress] = useState<ProgressState | null>(null);
   const [selectedSources, setSelectedSources] = useState<Set<Source>>(
     () => new Set(ALL_SOURCES),
   );
@@ -131,9 +147,44 @@ export function DashboardClient({
     }
   }, []);
 
+  function applyProgress(ev: HuntProgress) {
+    setProgress((p) => {
+      const base: ProgressState = p ?? {
+        stageIndex: 0,
+        companies: 0,
+        fetched: null,
+        matched: null,
+        scoreDone: null,
+        scoreTotal: null,
+      };
+      switch (ev.type) {
+        case "fetching":
+          return { ...base, stageIndex: 0, companies: ev.companies };
+        case "fetched":
+          return { ...base, fetched: ev.count };
+        case "filtering":
+          return { ...base, stageIndex: 1 };
+        case "filtered":
+          return { ...base, matched: ev.count };
+        case "reading_resume":
+          return { ...base, stageIndex: 2 };
+        case "scoring":
+          return {
+            ...base,
+            stageIndex: 3,
+            scoreDone: ev.done,
+            scoreTotal: ev.total,
+          };
+        default:
+          return base;
+      }
+    });
+  }
+
   async function runHunt() {
     setStatus("running");
     setError(null);
+    setProgress(null);
     try {
       const res = await fetch("/api/runs", {
         method: "POST",
@@ -147,20 +198,46 @@ export function DashboardClient({
           },
         }),
       });
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `Hunt failed (${res.status})`);
       }
-      const data: RunResult = await res.json();
+
+      // Read the NDJSON stream line by line.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalResult: RunResult | null = null;
+
+      const handleLine = (line: string) => {
+        if (!line.trim()) return;
+        const ev = JSON.parse(line) as HuntProgress;
+        if (ev.type === "result") finalResult = ev.result;
+        else if (ev.type === "error") throw new Error(ev.message);
+        else applyProgress(ev);
+      };
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? ""; // keep the trailing partial line
+        for (const line of lines) handleLine(line);
+      }
+      if (buffer.trim()) handleLine(buffer); // flush last line
+
+      if (!finalResult) throw new Error("Stream ended without a result.");
+
       const now = Date.now();
-      setResult(data);
+      setResult(finalResult);
       setFetchedAt(now);
       setStatus("done");
-      // Persist this run as the cached "latest", replacing any prior one.
+      setProgress(null);
       try {
         window.localStorage.setItem(
           LAST_RUN_KEY,
-          JSON.stringify({ result: data, fetchedAt: now }),
+          JSON.stringify({ result: finalResult, fetchedAt: now }),
         );
       } catch {
         /* quota exceeded or storage disabled — non-fatal */
@@ -168,6 +245,7 @@ export function DashboardClient({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
       setStatus("error");
+      setProgress(null);
     }
   }
 
@@ -203,8 +281,7 @@ export function DashboardClient({
           <h2 className="text-3xl font-bold mb-1">Dashboard</h2>
           <p className="text-muted-foreground">
             {status === "idle" && "Click below to run a fresh hunt."}
-            {status === "running" &&
-              "Fetching ~5,000 postings, filtering, then scoring with Claude. This takes ~60–90 seconds."}
+            {status === "running" && "Hunt in progress…"}
             {status === "done" && result && (
               <>
                 {filteredJobs.length === result.jobs.length
@@ -275,7 +352,7 @@ export function DashboardClient({
         </div>
       )}
 
-      {status === "running" && <RunningSkeleton />}
+      {status === "running" && <HuntProgressView progress={progress} />}
 
       {status === "done" && result && filteredJobs.length === 0 && (
         <div className="rounded-xl border bg-muted/20 p-12 text-center text-muted-foreground">
@@ -369,7 +446,7 @@ function JobCard({ job, pillClass }: { job: Job; pillClass: string }) {
               rel="noopener noreferrer"
               className="text-sm font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90"
             >
-              Apply ↗
+              Apply
             </a>
           </div>
         </div>
@@ -519,16 +596,84 @@ function SourceFilter({
   );
 }
 
-function RunningSkeleton() {
+function HuntProgressView({ progress }: { progress: ProgressState | null }) {
+  const idx = progress?.stageIndex ?? 0;
+
+  const rows: { label: string; detail: string | null }[] = [
+    {
+      label: `Fetching jobs from ${progress?.companies ?? "…"} companies`,
+      detail:
+        progress?.fetched != null
+          ? `${progress.fetched.toLocaleString()} postings fetched`
+          : null,
+    },
+    {
+      label: "Filtering to your titles, skills & location",
+      detail: progress?.matched != null ? `${progress.matched} jobs matched` : null,
+    },
+    {
+      label: "Reading your résumé profile",
+      detail: null,
+    },
+    {
+      label: "Scoring jobs against your résumé with Claude",
+      detail:
+        progress?.scoreTotal != null
+          ? `${progress.scoreDone ?? 0} / ${progress.scoreTotal} scored`
+          : null,
+    },
+  ];
+
   return (
-    <div className="space-y-3">
-      {[0, 1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className="rounded-xl border bg-muted/20 p-6 animate-pulse h-24"
-        />
-      ))}
+    <div className="rounded-xl border bg-muted/20 py-16 px-6 flex flex-col items-center">
+      <div className="w-full max-w-sm space-y-5">
+        {rows.map((row, i) => {
+          const state: "done" | "active" | "pending" =
+            i < idx ? "done" : i === idx ? "active" : "pending";
+          return (
+            <div key={i} className="flex items-start gap-3">
+              <StageIcon state={state} />
+              <div
+                className={cn(
+                  "flex-1 leading-tight",
+                  state === "pending" && "opacity-40",
+                )}
+              >
+                <div className={cn("text-sm", state === "active" && "font-medium")}>
+                  {row.label}
+                </div>
+                {row.detail && (
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {row.detail}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-10 text-xs text-muted-foreground">
+        This usually takes 30–90 seconds.
+      </p>
     </div>
+  );
+}
+
+function StageIcon({ state }: { state: "done" | "active" | "pending" }) {
+  if (state === "done") {
+    return (
+      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 text-xs">
+        ✓
+      </span>
+    );
+  }
+  if (state === "active") {
+    return (
+      <span className="mt-0.5 size-5 shrink-0 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
+    );
+  }
+  return (
+    <span className="mt-0.5 size-5 shrink-0 rounded-full border-2 border-muted-foreground/20" />
   );
 }
 

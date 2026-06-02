@@ -2,11 +2,13 @@
  * Hunt configuration — direct port of hunterr/config.yaml.
  * Edit freely; changes take effect on the next run.
  */
+import discovered from "./discovered.json";
 
 // Every slug below was validated against the live ATS API and confirmed to have
 // at least one India-located posting at the time of adding. Re-validate
 // periodically — boards change and companies migrate ATS providers.
-export const ATS_CONFIG = {
+// This is the hand-curated base; `npm run discover` appends to discovered.json.
+const BASE_ATS_CONFIG = {
   greenhouse: [
     // Indian-HQ
     "phonepe",
@@ -43,8 +45,48 @@ export const ATS_CONFIG = {
     "vercel",
     "verkada",
     "zscaler",
+    // Discovered via Google `site:boards.greenhouse.io "<city>"` + validated
+    "coupang",
+    "hackerrank",
+    "6sense",
+    "bitgo",
+    "vonage",
+    "stockx",
+    "gomotive",
+    "ibkr",
+    "singlestore",
+    "schrdinger",
+    "degreed",
   ],
-  lever: ["cred", "spotify", "matchgroup"],
+  lever: [
+    "cred",
+    "spotify",
+    "matchgroup",
+    // Discovered via Google `site:jobs.lever.co "<city>"` + validated
+    "safe",
+    "jumpcloud",
+    "vendavo",
+    "revefi",
+    "thinkahead",
+    "zeta",
+    "cyara",
+    "dnb",
+    "coupa",
+    "shyftlabs",
+    "egen",
+    "turvo",
+    "elfbeauty",
+    "moonpay",
+    // Indian SaaS / unicorns (case-sensitive slugs)
+    "Sprinto",
+    "meesho",
+    "mindtickle",
+    "fampay",
+    "netomi",
+    "hevodata",
+    "smart-working-solutions",
+    "binance",
+  ],
   ashby: [
     "linear",
     "vanta",
@@ -54,8 +96,32 @@ export const ATS_CONFIG = {
     "modal",
     "notion",
     "openai",
+    // Discovered via `site:jobs.ashbyhq.com "Bengaluru"` + validated.
+    // NOTE: Ashby slugs are case-sensitive and may contain dots/hyphens.
+    "harvey",
+    "Almabase",
+    "office-hours",
+    "flagright.com",
+    "ontologize",
+    "astronomer",
+    "atlan",
+    "gainsight",
   ],
-} as const;
+};
+
+// Merge curated base + script-discovered slugs, deduped. Order: base first.
+type Source = "greenhouse" | "lever" | "ashby";
+function mergeSlugs(src: Source): string[] {
+  const base = BASE_ATS_CONFIG[src] ?? [];
+  const extra = (discovered as Record<string, string[]>)[src] ?? [];
+  return [...new Set([...base, ...extra])];
+}
+
+export const ATS_CONFIG: Record<Source, string[]> = {
+  greenhouse: mergeSlugs("greenhouse"),
+  lever: mergeSlugs("lever"),
+  ashby: mergeSlugs("ashby"),
+};
 
 export const ROLE_KEYWORDS = [
   "full stack",

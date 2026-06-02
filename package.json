@@ -9,13 +9,15 @@
     "lint": "eslint",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "create-user": "tsx --env-file=.env.local scripts/create-user.ts"
+    "create-user": "tsx --env-file=.env.local scripts/create-user.ts",
+    "discover": "tsx --env-file=.env.local scripts/discover.ts",
+    "migrate": "tsx --env-file=.env.local scripts/migrate-to-postgres.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
     "@base-ui/react": "^1.5.0",
+    "@neondatabase/serverless": "^1.1.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
@@ -34,7 +36,6 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",

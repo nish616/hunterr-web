@@ -9,7 +9,9 @@ export default async function ResumePage() {
   const session = await auth();
   if (!session?.user) redirect("/signin");
 
-  const { profileMd, resumeText, exists } = await loadCurrentProfile();
+  const { profileMd, resumeText, exists } = await loadCurrentProfile(
+    session.user.id,
+  );
 
   return (
     <main className="flex-1">
