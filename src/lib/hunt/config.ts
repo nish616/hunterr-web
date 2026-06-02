@@ -196,7 +196,10 @@ export const BLOCKED_REMOTE_REGIONS = [
   "british columbia",
 ];
 
-// Ceiling on jobs sent to the AI per run — guards against a runaway config.
-export const AI_MAX_JOBS_PER_RUN = 30;
-export const AI_MAX_CONCURRENCY = 2;
-export const AI_MODEL = "claude-sonnet-4-6";
+// Triage pool: the most keyword-relevant matched jobs are sent to a cheap Haiku
+// triage call, which picks the best AI_SCORE_LIMIT for full Sonnet scoring.
+export const AI_MAX_JOBS_PER_RUN = 80; // max jobs considered (triage pool size)
+export const AI_SCORE_LIMIT = 30; // how many the triage selects for full scoring
+export const AI_MAX_CONCURRENCY = 4; // parallel Sonnet scoring calls
+export const AI_MODEL = "claude-sonnet-4-6"; // full fit-scoring model
+export const AI_TRIAGE_MODEL = "claude-haiku-4-5"; // cheap relevance-ranking model

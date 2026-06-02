@@ -1,7 +1,7 @@
 import { fetchAll } from "./fetchers";
 import { filterAndRank } from "./filter";
-import { scoreJobs } from "./scoring";
-import { AI_MAX_JOBS_PER_RUN, ATS_CONFIG } from "./config";
+import { scoreJobs, triageJobs } from "./scoring";
+import { AI_MAX_JOBS_PER_RUN, AI_SCORE_LIMIT, ATS_CONFIG } from "./config";
 import type {
   FilterOverrides,
   Job,
@@ -47,18 +47,35 @@ export async function runHunt(options: {
   const matched = filterAndRank(fetched, options?.filters);
   onProgress?.({ type: "filtered", count: matched.length });
 
-  const limited = matched.slice(0, AI_MAX_JOBS_PER_RUN);
+  // Triage pool: the top-N most keyword-relevant matched jobs.
+  const pool = matched.slice(0, AI_MAX_JOBS_PER_RUN);
 
-  let scoredJobs: Job[] = limited;
+  let scoredJobs: Job[] = [];
   let totalScored = 0;
-  if (withAi && limited.length > 0) {
-    onProgress?.({ type: "reading_resume" });
-    scoredJobs = await scoreJobs(limited, options.userId, onProgress);
+  if (withAi && pool.length > 0) {
+    // Cheap Haiku triage picks the best AI_SCORE_LIMIT for full scoring.
+    const toScore = await triageJobs(
+      pool,
+      options.userId,
+      AI_SCORE_LIMIT,
+      onProgress,
+    );
+    scoredJobs = await scoreJobs(toScore, options.userId, onProgress);
     totalScored = scoredJobs.filter((j) => j.aiScore !== undefined).length;
   }
 
+  // Return EVERY matched job, not just the scored ones, so the dashboard can
+  // show what was filtered down (transparency / audit). The scored subset gets
+  // its AI fields merged back in by job key. Descriptions are stripped to keep
+  // the payload (and the client-side cache) lean.
+  const scoredByKey = new Map(scoredJobs.map((j) => [jobKey(j), j]));
+  const allMatched = matched.map((j) => {
+    const merged = scoredByKey.get(jobKey(j)) ?? j;
+    return { ...merged, description: "" };
+  });
+
   return {
-    jobs: rank(scoredJobs),
+    jobs: rank(allMatched),
     stats: {
       totalFetched: fetched.length,
       totalMatched: matched.length,
@@ -67,4 +84,8 @@ export async function runHunt(options: {
       durationMs: Date.now() - t0,
     },
   };
+}
+
+function jobKey(j: Job): string {
+  return j.url || `${j.company}::${j.title}`;
 }

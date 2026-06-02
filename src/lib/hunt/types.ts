@@ -57,7 +57,8 @@ export type HuntProgress =
   | { type: "fetched"; count: number }
   | { type: "filtering" }
   | { type: "filtered"; count: number }
-  | { type: "reading_resume" }
+  | { type: "triaging"; pool: number }
+  | { type: "triaged"; selected: number }
   | { type: "scoring"; done: number; total: number }
   | { type: "result"; result: RunResult }
   | { type: "error"; message: string };

@@ -33,6 +33,12 @@ export default async function ProfilePage() {
                 Dashboard
               </Link>
               <Link
+                href="/dashboard/jobs"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Jobs
+              </Link>
+              <Link
                 href="/dashboard/resume"
                 className="text-muted-foreground hover:text-foreground"
               >

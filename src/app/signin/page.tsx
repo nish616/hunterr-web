@@ -21,7 +21,7 @@ export default function SignInPage() {
           <p>
             Don&apos;t have an account?{" "}
             <a
-              href="mailto:nishin@example.com"
+              href="mailto:nishin616+hunterrinvite@gmail.com"
               className="underline underline-offset-4 hover:text-foreground"
             >
               Reach out

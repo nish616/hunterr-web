@@ -34,6 +34,9 @@ export function ProfileForm({
   const [maxAgeDays, setMaxAgeDays] = useState<number>(
     preferences.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS,
   );
+  const [linkedinUrl, setLinkedinUrl] = useState(preferences.linkedinUrl ?? "");
+  const [githubUrl, setGithubUrl] = useState(preferences.githubUrl ?? "");
+  const [portfolioUrl, setPortfolioUrl] = useState(preferences.portfolioUrl ?? "");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +51,21 @@ export function ProfileForm({
       return;
     }
 
+    // Lightweight URL check: must be empty, or start with http(s)://.
+    const links: [string, string][] = [
+      ["LinkedIn", linkedinUrl],
+      ["GitHub", githubUrl],
+      ["Portfolio", portfolioUrl],
+    ];
+    for (const [name, value] of links) {
+      const v = value.trim();
+      if (v && !/^https?:\/\//i.test(v)) {
+        setSaveState("error");
+        setError(`${name} URL must start with http:// or https://`);
+        return;
+      }
+    }
+
     setSaveState("saving");
 
     const res = await savePreferencesAction({
@@ -55,6 +73,9 @@ export function ProfileForm({
       excludedTitles: excludedTitles.trim() || undefined,
       skills: skills.trim(),
       maxAgeDays,
+      linkedinUrl: linkedinUrl.trim() || undefined,
+      githubUrl: githubUrl.trim() || undefined,
+      portfolioUrl: portfolioUrl.trim() || undefined,
     });
     if (res.ok) {
       setSaveState("saved");
@@ -101,6 +122,45 @@ export function ProfileForm({
         value={skills}
         onChange={setSkills}
       />
+
+      <div className="space-y-4 pt-2 border-t border-border">
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+            Links
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Public profile URLs. The deep-dive agent can reference these when
+            drafting a cover letter, and you can copy them when applying.
+          </p>
+        </div>
+        <Field
+          id="linkedin-url"
+          label="LinkedIn"
+          hint="Your LinkedIn profile URL."
+          placeholder="https://www.linkedin.com/in/your-handle"
+          defaultsNote="Optional."
+          value={linkedinUrl}
+          onChange={setLinkedinUrl}
+        />
+        <Field
+          id="github-url"
+          label="GitHub"
+          hint="Your GitHub profile URL."
+          placeholder="https://github.com/your-handle"
+          defaultsNote="Optional."
+          value={githubUrl}
+          onChange={setGithubUrl}
+        />
+        <Field
+          id="portfolio-url"
+          label="Website / portfolio"
+          hint="Personal site, portfolio, or writing."
+          placeholder="https://your-domain.com"
+          defaultsNote="Optional."
+          value={portfolioUrl}
+          onChange={setPortfolioUrl}
+        />
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="search-window">

@@ -20,12 +20,16 @@ import type {
   Source,
   Verdict,
 } from "@/lib/hunt/types";
+import { LAST_RUN_KEY, CACHE_TTL_MS } from "@/lib/run-cache";
+import { DeepDivePanel } from "./jobs/deep-dive-panel";
 
 type ProgressState = {
-  stageIndex: number; // 0 fetch · 1 filter · 2 resume · 3 score
+  stageIndex: number; // 0 fetch, 1 filter, 2 triage, 3 score
   companies: number;
   fetched: number | null;
   matched: number | null;
+  triagePool: number | null;
+  triageSelected: number | null;
   scoreDone: number | null;
   scoreTotal: number | null;
 };
@@ -59,11 +63,6 @@ function formatPosted(postedAt: string): string {
 }
 
 type Status = "idle" | "running" | "done" | "error";
-
-// Cache the latest run client-side so results survive refresh/navigation,
-// until a new hunt replaces it or the TTL lapses.
-const LAST_RUN_KEY = "hunterr.lastRun.v1";
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function formatAgo(ts: number): string {
   const secs = Math.floor((Date.now() - ts) / 1000);
@@ -154,6 +153,8 @@ export function DashboardClient({
         companies: 0,
         fetched: null,
         matched: null,
+        triagePool: null,
+        triageSelected: null,
         scoreDone: null,
         scoreTotal: null,
       };
@@ -166,8 +167,10 @@ export function DashboardClient({
           return { ...base, stageIndex: 1 };
         case "filtered":
           return { ...base, matched: ev.count };
-        case "reading_resume":
-          return { ...base, stageIndex: 2 };
+        case "triaging":
+          return { ...base, stageIndex: 2, triagePool: ev.pool };
+        case "triaged":
+          return { ...base, triageSelected: ev.selected };
         case "scoring":
           return {
             ...base,
@@ -274,6 +277,8 @@ export function DashboardClient({
 
   const grouped = groupByVerdict(filteredJobs);
 
+  const [diveJob, setDiveJob] = useState<Job | null>(null);
+
   return (
     <section className="container mx-auto px-6 py-10 max-w-5xl">
       <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
@@ -354,6 +359,27 @@ export function DashboardClient({
 
       {status === "running" && <HuntProgressView progress={progress} />}
 
+      {status === "done" && result && (
+        <Link
+          href="/dashboard/jobs"
+          className="mb-6 flex items-center justify-between gap-4 flex-wrap rounded-xl border bg-muted/10 px-5 py-3 text-sm hover:bg-muted/20 transition-colors"
+        >
+          <span className="text-muted-foreground">
+            <span className="font-medium text-foreground">
+              View all {result.stats.totalMatched} matched jobs
+            </span>{" "}
+            in one place
+            {result.stats.totalMatched - result.stats.totalScored > 0
+              ? `, including the ${
+                  result.stats.totalMatched - result.stats.totalScored
+                } that weren't AI-scored`
+              : ""}
+            .
+          </span>
+          <span className="font-medium whitespace-nowrap">Open Jobs &rarr;</span>
+        </Link>
+      )}
+
       {status === "done" && result && filteredJobs.length === 0 && (
         <div className="rounded-xl border bg-muted/20 p-12 text-center text-muted-foreground">
           No jobs match the current source filter. Re-enable a source above to
@@ -371,37 +397,46 @@ export function DashboardClient({
                 pillClass={VERDICT_PILL[verdict]}
                 jobs={grouped[verdict]}
                 defaultOpen={verdict !== "skip"}
+                onDeepDive={setDiveJob}
               />
             ) : null,
           )}
           {grouped.unscored.length > 0 && (
             <VerdictSection
-              title="❓ Not scored"
+              title="Matched, not scored"
+              note="These passed your filters but were not in the AI-scored shortlist. Review them to spot anything the ranking missed."
               pillClass={VERDICT_PILL.skip}
               jobs={grouped.unscored}
               defaultOpen={false}
+              onDeepDive={setDiveJob}
             />
           )}
         </div>
       )}
+
+      <DeepDivePanel job={diveJob} onClose={() => setDiveJob(null)} />
     </section>
   );
 }
 
 function VerdictSection({
   title,
+  note,
   pillClass,
   jobs,
   defaultOpen,
+  onDeepDive,
 }: {
   title: string;
+  note?: string;
   pillClass: string;
   jobs: Job[];
   defaultOpen: boolean;
+  onDeepDive: (job: Job) => void;
 }) {
   return (
     <details open={defaultOpen} className="group">
-      <summary className="cursor-pointer text-xl font-semibold mb-4 list-none flex items-center gap-3">
+      <summary className="cursor-pointer text-xl font-semibold mb-1 list-none flex items-center gap-3">
         <span className="text-muted-foreground transition-transform group-open:rotate-90">
           ▸
         </span>
@@ -410,16 +445,32 @@ function VerdictSection({
           ({jobs.length})
         </span>
       </summary>
-      <div className="grid gap-4">
+      {note && (
+        <p className="text-sm text-muted-foreground mb-4 ml-7">{note}</p>
+      )}
+      <div className="grid gap-4 mt-4">
         {jobs.map((j, i) => (
-          <JobCard key={`${j.company}-${j.url}-${i}`} job={j} pillClass={pillClass} />
+          <JobCard
+            key={`${j.company}-${j.url}-${i}`}
+            job={j}
+            pillClass={pillClass}
+            onDeepDive={() => onDeepDive(j)}
+          />
         ))}
       </div>
     </details>
   );
 }
 
-function JobCard({ job, pillClass }: { job: Job; pillClass: string }) {
+function JobCard({
+  job,
+  pillClass,
+  onDeepDive,
+}: {
+  job: Job;
+  pillClass: string;
+  onDeepDive: () => void;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -440,6 +491,14 @@ function JobCard({ job, pillClass }: { job: Job; pillClass: string }) {
                 {job.aiScore}/10 · {job.aiVerdict}
               </span>
             ) : null}
+            <button
+              type="button"
+              onClick={onDeepDive}
+              title="Runs an AI agent that researches the company, drafts a tailored cover letter, and suggests resume rewrites for this role. ~30–90s."
+              className="text-sm font-medium px-3 py-1.5 rounded-md border border-border text-foreground hover:bg-muted"
+            >
+              Deep dive
+            </button>
             <a
               href={job.url}
               target="_blank"
@@ -451,7 +510,9 @@ function JobCard({ job, pillClass }: { job: Job; pillClass: string }) {
           </div>
         </div>
       </CardHeader>
-      {(job.aiSummary || (job.aiStrengths?.length ?? 0) > 0) && (
+      {(job.aiSummary ||
+        (job.aiStrengths?.length ?? 0) > 0 ||
+        job.matchedSkills.length > 0) && (
         <CardContent className="space-y-3 text-sm">
           {job.aiSummary && (
             <p className="text-muted-foreground italic">{job.aiSummary}</p>
@@ -612,11 +673,18 @@ function HuntProgressView({ progress }: { progress: ProgressState | null }) {
       detail: progress?.matched != null ? `${progress.matched} jobs matched` : null,
     },
     {
-      label: "Reading your résumé profile",
-      detail: null,
+      label: "Ranking the best matches (Haiku)",
+      detail:
+        progress?.triageSelected != null
+          ? `top ${progress.triageSelected}${
+              progress.triagePool ? ` of ${progress.triagePool}` : ""
+            } selected`
+          : progress?.triagePool != null
+            ? `ranking ${progress.triagePool}…`
+            : null,
     },
     {
-      label: "Scoring jobs against your résumé with Claude",
+      label: "Scoring shortlist against your résumé (Sonnet)",
       detail:
         progress?.scoreTotal != null
           ? `${progress.scoreDone ?? 0} / ${progress.scoreTotal} scored`

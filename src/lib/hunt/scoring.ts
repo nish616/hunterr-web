@@ -4,7 +4,7 @@ import path from "node:path";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import type { Job, ProgressCallback, Verdict } from "./types";
-import { AI_MODEL, AI_MAX_CONCURRENCY } from "./config";
+import { AI_MODEL, AI_MAX_CONCURRENCY, AI_TRIAGE_MODEL } from "./config";
 import { db, schema } from "@/lib/db";
 
 export const FitAnalysisSchema = z.object({
@@ -84,6 +84,121 @@ async function loadResumeContext(userId: string): Promise<string> {
     );
   }
   return `## Candidate Profile (structured)\n\n${profile}\n\n## Candidate Resume (raw)\n\n${resume}`;
+}
+
+async function loadProfileOnly(userId: string): Promise<string> {
+  const row = await db.query.users.findFirst({
+    where: eq(schema.users.id, userId),
+    columns: { resumeProfile: true, resumeText: true },
+  });
+  // Prefer the compact structured profile; fall back to raw text.
+  return row?.resumeProfile || row?.resumeText || "";
+}
+
+const TRIAGE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    selected: {
+      type: "array",
+      items: { type: "integer" },
+      description: "Indices of the selected postings, best fit first.",
+    },
+  },
+  required: ["selected"],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Cheap relevance triage with Haiku. Given the full matched pool, returns the
+ * `limit` best-fitting jobs (by seniority fit + skill overlap) so the expensive
+ * Sonnet scoring only runs on jobs worth a careful verdict.
+ *
+ * Falls back to the existing keyword ranking (the input order) on any failure,
+ * or when there's already <= limit jobs (no point spending a call).
+ */
+export async function triageJobs(
+  jobs: Job[],
+  userId: string,
+  limit: number,
+  onProgress?: ProgressCallback,
+): Promise<Job[]> {
+  onProgress?.({ type: "triaging", pool: jobs.length });
+
+  if (jobs.length <= limit) {
+    onProgress?.({ type: "triaged", selected: jobs.length });
+    return jobs;
+  }
+
+  const fallback = () => {
+    onProgress?.({ type: "triaged", selected: Math.min(limit, jobs.length) });
+    return jobs.slice(0, limit);
+  };
+
+  const apiKey = await resolveApiKey();
+  if (!apiKey) return fallback();
+
+  const profile = await loadProfileOnly(userId);
+  if (!profile) return fallback();
+
+  // Compact one-line summary per job, with a stable index.
+  const summaries = jobs
+    .map(
+      (j, i) =>
+        `${i}. ${j.title} — ${j.company} (${j.location || "?"}) [skills: ${
+          j.matchedSkills.join(", ") || "none"
+        }]`,
+    )
+    .join("\n");
+
+  const prompt =
+    `Candidate profile:\n${profile}\n\n` +
+    `Here are ${jobs.length} job postings as "index. title — company (location) [matched skills]":\n${summaries}\n\n` +
+    `Select the ${limit} postings that best fit this candidate. Judge primarily by:\n` +
+    `1. Seniority fit — penalize roles clearly above the candidate's level (e.g. Staff / Principal / Lead / Head-of when the candidate is mid-level) or clearly below it.\n` +
+    `2. Overlap between the role and the candidate's core skills and experience.\n` +
+    `Return the indices of the selected postings, best fit first, at most ${limit}.`;
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: AI_TRIAGE_MODEL,
+      max_tokens: 1024,
+      output_config: {
+        format: { type: "json_schema", schema: TRIAGE_JSON_SCHEMA },
+      },
+      messages: [{ role: "user", content: prompt }],
+    } as unknown as Anthropic.MessageCreateParamsNonStreaming);
+
+    const textBlock = response.content.find(
+      (b): b is Extract<typeof b, { type: "text" }> => b.type === "text",
+    );
+    if (!textBlock) return fallback();
+
+    const parsed = JSON.parse(textBlock.text) as { selected?: unknown };
+    if (!Array.isArray(parsed.selected)) return fallback();
+
+    // Validate, dedupe, keep in-range, cap to limit.
+    const seen = new Set<number>();
+    const picked: Job[] = [];
+    for (const raw of parsed.selected) {
+      const i = typeof raw === "number" ? raw : Number(raw);
+      if (!Number.isInteger(i) || i < 0 || i >= jobs.length) continue;
+      if (seen.has(i)) continue;
+      seen.add(i);
+      picked.push(jobs[i]);
+      if (picked.length >= limit) break;
+    }
+    if (picked.length === 0) return fallback();
+
+    onProgress?.({ type: "triaged", selected: picked.length });
+    return picked;
+  } catch (err) {
+    console.error(
+      "Triage failed, falling back to keyword ranking:",
+      err instanceof Error ? err.message : err,
+    );
+    return fallback();
+  }
 }
 
 async function scoreOne(

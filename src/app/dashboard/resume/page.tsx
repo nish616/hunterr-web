@@ -28,6 +28,12 @@ export default async function ResumePage() {
               >
                 Dashboard
               </Link>
+              <Link
+                href="/dashboard/jobs"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Jobs
+              </Link>
               <Link href="/dashboard/resume" className="text-foreground font-medium">
                 Resume
               </Link>

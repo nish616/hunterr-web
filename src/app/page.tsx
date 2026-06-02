@@ -71,14 +71,14 @@ export default function LandingPage() {
       <section className="container mx-auto px-6 pt-24 pb-16 md:pt-32 md:pb-20 max-w-3xl text-center">
         <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 text-xs font-medium rounded-full border bg-muted/40 text-muted-foreground">
           <span className="size-1.5 rounded-full bg-emerald-500" />
-          Private alpha — invite only
+          Private alpha, invite only
         </div>
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
           Hunterr
         </h1>
         <p className="text-lg md:text-2xl text-muted-foreground mb-10 leading-relaxed">
           An AI job-discovery agent. Scans 85 company job boards, ranks roles
-          against your résumé with Claude.
+          against your resume with Claude.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Button size="lg" nativeButton={false} render={<Link href="/signin" />}>
@@ -104,10 +104,10 @@ export default function LandingPage() {
           How it works
         </h2>
         <p className="text-muted-foreground text-center mb-12 max-w-xl mx-auto">
-          A three-stage pipeline. Cheap upstream filtering keeps the expensive
-          AI step focused on jobs worth analyzing.
+          A four-stage pipeline. Cheap upstream filtering and ranking keep the
+          expensive scoring step focused on jobs worth analyzing.
         </p>
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <div className="text-xs font-medium text-muted-foreground mb-1">
@@ -115,13 +115,13 @@ export default function LandingPage() {
               </div>
               <CardTitle>Crawl</CardTitle>
               <CardDescription className="pt-2">
-                Pulls every posting from Greenhouse, Lever, and Ashby — covers
-                85 companies with active India hiring.
+                Pulls every posting from Greenhouse, Lever and Ashby across 85
+                companies with active India hiring.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              ~9,000 postings fetched in parallel in seconds — no scraping, no
-              auth.
+              About 9,000 postings fetched in parallel in seconds. No scraping,
+              no auth.
             </CardContent>
           </Card>
 
@@ -132,13 +132,12 @@ export default function LandingPage() {
               </div>
               <CardTitle>Filter</CardTitle>
               <CardDescription className="pt-2">
-                Role keywords, location, posted-age, skill match. Geofenced
-                US/CA remote roles auto-rejected.
+                Your titles, skills, location and posting age. Geofenced US and
+                Canada remote roles are auto-rejected.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              5,000 postings narrow to ~30 worth analyzing — saves AI cost on
-              roles you&apos;d never apply to.
+              Thousands of postings narrow to a shortlist of real matches.
             </CardContent>
           </Card>
 
@@ -147,15 +146,30 @@ export default function LandingPage() {
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 Step 03
               </div>
-              <CardTitle>Score with Claude</CardTitle>
+              <CardTitle>Rank</CardTitle>
               <CardDescription className="pt-2">
-                Each surviving JD goes to Claude Sonnet 4.6 with your resume.
-                Structured fit analysis: score 1–10, verdict, strengths, gaps.
+                A cheap Claude Haiku pass reads your profile and ranks the
+                matches by seniority fit and skill overlap, keeping the best 30.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Resume prompt-cached so 30 jobs cost ~$0.10. Verdicts ranked
-              strong → stretch → skip.
+              No tokens wasted scoring roles you would never get.
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                Step 04
+              </div>
+              <CardTitle>Score with Claude</CardTitle>
+              <CardDescription className="pt-2">
+                Each of the 30 goes to Claude Sonnet 4.6 with your resume for a
+                verdict, a 1-10 fit score, strengths and gaps.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Resume prompt-cached, so a full run costs roughly 20 to 50 cents.
             </CardContent>
           </Card>
         </div>
@@ -224,7 +238,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="container mx-auto px-6 py-10 mt-12 border-t border-border text-center text-sm text-muted-foreground">
-        Built by Nishin S · {new Date().getFullYear()}
+        Built by Nishin S, {new Date().getFullYear()}
       </footer>
     </main>
   );

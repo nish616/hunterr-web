@@ -2,22 +2,11 @@ import { auth, signOut } from "@/auth";
 import { Button } from "@/components/ui/button";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { db, schema } from "@/lib/db";
-import type { UserPreferences } from "@/lib/db/schema";
-import { DashboardClient } from "./dashboard-client";
+import { JobsClient } from "./jobs-client";
 
-export default async function DashboardPage() {
+export default async function JobsPage() {
   const session = await auth();
   if (!session?.user) redirect("/signin");
-
-  // Hydrate the client with the user's saved preferences (if any).
-  const row = await db.query.users.findFirst({
-    where: eq(schema.users.id, session.user.id),
-    columns: { preferences: true },
-  });
-
-  const initialPreferences: UserPreferences = row?.preferences ?? {};
 
   return (
     <main className="flex-1">
@@ -28,12 +17,15 @@ export default async function DashboardPage() {
               <h1 className="text-lg font-semibold">Hunterr</h1>
             </Link>
             <nav className="flex items-center gap-4 text-sm">
-              <Link href="/dashboard" className="text-foreground font-medium">
+              <Link
+                href="/dashboard"
+                className="text-muted-foreground hover:text-foreground"
+              >
                 Dashboard
               </Link>
               <Link
                 href="/dashboard/jobs"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-foreground font-medium"
               >
                 Jobs
               </Link>
@@ -75,7 +67,7 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <DashboardClient initialPreferences={initialPreferences} />
+      <JobsClient />
     </main>
   );
 }
