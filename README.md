@@ -231,10 +231,6 @@ Hosted on Vercel with Neon Postgres. To deploy:
    `ANTHROPIC_API_KEY`.
 4. Deploy, then add a custom domain (point a CNAME at Vercel from your DNS host).
 
-Note on serverless: a full run can take 60 to 90 seconds. The Vercel Hobby plan
-caps functions at 60 seconds, so either upgrade to Pro (300 seconds) or lower the
-per-run job cap.
-
 ## License
 
 Personal project. Not open for contributions.
