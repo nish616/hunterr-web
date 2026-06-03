@@ -125,7 +125,7 @@ export function DashboardClient({
   const maxAgeDays = initialPreferences.maxAgeDays;
 
   // Titles and skills are required before a search can run.
-  const needsConfig = preferredTitles.length === 0 && skills.length === 0;
+  const needsConfig = preferredTitles.length === 0 || skills.length === 0;
 
   // Restore the last run from localStorage on mount (until a new run replaces it
   // or the cache expires). Keeps results visible across refresh / navigation.

@@ -112,7 +112,7 @@ async function loadResumeContext(userId: string): Promise<string> {
   const prefs = row?.preferences ?? {};
   const linkLines: string[] = [];
   if (prefs.linkedinUrl) linkLines.push(`LinkedIn: ${prefs.linkedinUrl}`);
-  if (prefs.githubUrl) linkLines.push(`GitHub: ${prefs.linkedinUrl}`);
+  if (prefs.githubUrl) linkLines.push(`GitHub: ${prefs.githubUrl}`);
   if (prefs.portfolioUrl) linkLines.push(`Portfolio: ${prefs.portfolioUrl}`);
   const linksBlock = linkLines.length
     ? `\n\n## Candidate Links\n\n${linkLines.join("\n")}\n\nYou may reference these in the cover letter and may fetch_url any of them to read more about the candidate.`

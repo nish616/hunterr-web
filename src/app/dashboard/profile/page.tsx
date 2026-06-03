@@ -9,17 +9,11 @@ import { ProfileForm } from "./profile-form";
 
 
 export default async function ProfilePage() {
-  let session;
-  try {
-    session = await auth();
-    if (!session?.user) redirect("/signin");
-  } catch (err) {
-    console.error("Auth check failed on /dashboard/profile:", err);
-    session = null;
-  }
+  const session = await auth();
+  if (!session?.user) redirect("/signin");
 
   const row = await db.query.users.findFirst({
-    where: eq(schema.users.id, session!.user.id),
+    where: eq(schema.users.id, session.user.id),
     columns: { preferences: true },
   });
   const preferences: UserPreferences = row?.preferences ?? {};
