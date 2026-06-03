@@ -19,7 +19,7 @@ const TOTAL_COMPANIES =
 // can be inserted without renumbering.
 const VERDICT_RANK = { strong: 4, good: 3, stretch: 2, skip: 1 } as const;
 
-function rank(jobs: Job[]): Job[] {
+export function rank(jobs: Job[]): Job[] {
   return [...jobs].sort((a, b) => {
     const ar = a.aiVerdict ? VERDICT_RANK[a.aiVerdict] : 0;
     const br = b.aiVerdict ? VERDICT_RANK[b.aiVerdict] : 0;

@@ -140,7 +140,7 @@ async function loadResumeContext(userId: string): Promise<string> {
   return `## Candidate Profile (structured)\n\n${profile}\n\n## Candidate Resume (raw)\n\n${resume}${linksBlock}`;
 }
 
-type ToolOutcome = {
+export type ToolOutcome = {
   ok: boolean;
   preview: string;
   content: string;
@@ -156,7 +156,7 @@ const BLOCKED_HOST_PATTERNS: RegExp[] = [
   /(?:^|\.)linkedin\.com$/i,
 ];
 
-function isBlockedHost(url: string): boolean {
+export function isBlockedHost(url: string): boolean {
   try {
     const host = new URL(url).hostname;
     return BLOCKED_HOST_PATTERNS.some((re) => re.test(host));
@@ -207,7 +207,7 @@ async function runFetchUrl(url: string): Promise<ToolOutcome> {
  * Patterns are intentionally broad — false positives on candidate-facing
  * prose using these phrases are extremely unlikely.
  */
-function stripMetaCommentary(content: string): string {
+export function stripMetaCommentary(content: string): string {
   const linePrefixPatterns: RegExp[] = [
     /^>?\s*\*{0,2}\s*(?:Note|Disclaimer|Caveat|Important|Heads[ -]?up)\s*\*{0,2}\s*:/i,
   ];
@@ -253,7 +253,7 @@ function stripMetaCommentary(content: string): string {
   return cleanedParagraphs.join("\n\n").trim();
 }
 
-function runSaveFinding(input: Record<string, unknown>): ToolOutcome {
+export function runSaveFinding(input: Record<string, unknown>): ToolOutcome {
   const kind = input.kind as DeepDiveSectionKind;
   const rawContent = typeof input.content === "string" ? input.content : "";
   if (!kind || !VALID_SECTIONS.includes(kind)) {
