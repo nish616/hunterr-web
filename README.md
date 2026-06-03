@@ -18,25 +18,25 @@ Two AI surfaces, each chosen for what it's actually good at.
 1. **Crawl** — public Greenhouse, Lever, and Ashby APIs in parallel. ~9,000 postings in a few seconds.
 2. **Filter** — title, exclude-title, location, posting-age, skill keywords. Word-boundary matching.
 3. **Triage (LLM step)** — one Claude Haiku call ranks the matched pool down to the top 30 by seniority + skill fit.
-4. **Score (LLM step)** — each of the 30 goes to Claude Sonnet with your resume prompt-cached. Returns a verdict (strong / stretch / skip), 1–10 score, strengths, gaps. ~$0.20–0.50 per run.
+4. **Score (LLM step)** — each of the 30 goes to Claude Sonnet with your resume prompt-cached. Returns a verdict (strong / good / stretch / skip), 1–10 score, strengths, gaps. ~$0.20–0.50 per run.
 
 **Per-job deep dive — an agent** (Claude in a tool-use loop, choosing what to do next):
 
 Click *Deep dive* on any scored job. The agent has two tools — `fetch_url` and
-`save_finding` — and runs up to 10 turns to produce up to six grounded sections:
+`save_finding` — and runs up to 10 turns to produce up to four grounded sections:
 
 - **Company brief** — what they do, stage/funding, leadership, red flags. Skipped when the JD alone doesn't carry enough signal (no web-search tool).
-- **Tech stack reality check** — what the engineering blog says they use vs. what the JD claims. Skipped unless the JD links somewhere the agent can `fetch_url`.
 - **Deep gap analysis** — concrete overlaps and gaps between your resume and the JD, citing exact phrases from both.
 - **Tailored cover letter** — ~250 words, specific, no platitudes; references your linked GitHub/portfolio when relevant.
-- **Resume bullet rewrites** — which bullets to emphasize, drop, or reword for this JD, in before/after form.
-- **Questions to ask them** — 4–6 interviewer questions that show you did the research.
+- **Resume bullet rewrites** — which bullets to emphasize, reword, or *add* (when the candidate has clear evidence of a JD-required skill that isn't on the resume yet), in before/after form.
 
 The agent decides which sections to attempt based on what its tools surface
 and skips any section it can't ground in fact rather than fabricating. Hard
-caps on searches, fetches, and iterations keep spend at ~$0.25 per dive.
-Results stream live into the dashboard and persist per-job in Postgres, so
-reopening the panel shows the prior dive without re-running.
+caps on fetches and iterations keep spend at ~$0.25 per dive. Results stream
+live into the dashboard and persist per-job in Postgres, so reopening the
+panel shows the prior dive without re-running.
+
+![Deep-dive panel showing the agent's activity log and the generated sections](public/screenshots/deep-dive.png)
 
 The split: predictable, low-cost bulk discovery; high-touch per-job depth on
 demand.
