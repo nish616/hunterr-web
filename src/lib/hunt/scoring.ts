@@ -9,7 +9,7 @@ import { db, schema } from "@/lib/db";
 
 export const FitAnalysisSchema = z.object({
   fit_score: z.number().int().min(1).max(10),
-  verdict: z.enum(["strong", "stretch", "skip"]),
+  verdict: z.enum(["strong", "good", "stretch", "skip"]),
   strengths: z.array(z.string()).min(1).max(3),
   gaps: z.array(z.string()).max(3),
   summary: z.string(),
@@ -23,7 +23,7 @@ const FIT_JSON_SCHEMA = {
   type: "object",
   properties: {
     fit_score: { type: "integer", description: "Overall fit 1 (poor) to 10 (excellent)." },
-    verdict: { type: "string", enum: ["strong", "stretch", "skip"] },
+    verdict: { type: "string", enum: ["strong", "good", "stretch", "skip"] },
     strengths: { type: "array", items: { type: "string" }, description: "1-3 concrete reasons this role fits the candidate." },
     gaps: { type: "array", items: { type: "string" }, description: "0-3 specific gaps or concerns." },
     summary: { type: "string", description: "One sentence explaining the verdict." },
@@ -45,9 +45,12 @@ When grading, weigh these signals in order of importance:
 - Requirement overlap: alignment on the role's core required skills, tools, or competencies outweighs adjacent ones. Distinguish must-haves from nice-to-haves — a missing must-have is usually a deal-breaker; a missing nice-to-have rarely is. (For engineers this is the tech stack; for designers it's tools like Figma plus competencies like user research, design systems, prototyping; judge by what THIS role actually requires.)
 - Domain context: prior experience in the role's domain (fintech, devtools, healthcare, consumer, etc.) is a meaningful differentiator. Absence is a soft gap, not a hard one, unless the role is explicitly domain-led.
 
-A "strong" verdict means the candidate is well-positioned, the eligibility checks pass, and they should apply with high confidence.
+A "strong" verdict means the candidate is well-positioned across the board — eligibility passes, core requirements overlap deeply, and they should apply with high confidence.
+A "good" verdict means a solid fit — eligibility passes, most core requirements overlap, and the candidate should apply. There may be one notable gap, but it's not a deal-breaker. This is the median between "strong" (no real concerns) and "stretch" (worth applying despite notable gaps).
 A "stretch" verdict means it's worth applying but with notable gaps the candidate will need to address in cover-letter framing.
 A "skip" verdict means the role likely isn't a good use of time — hard eligibility issues, deep requirement mismatch, or significant seniority gap.
+
+Score-to-verdict mapping is strict: fit_score 9-10 → "strong", fit_score 7-8 → "good", fit_score 4-6 → "stretch", fit_score 1-3 → "skip". A 7/10 is a genuine recommendation to apply, not a hedge.
 
 Be specific in strengths and gaps — point to concrete claims in the resume and concrete requirements in the JD, not generic praise or hedging. Quote exact phrases where useful.`;
 

@@ -1,5 +1,7 @@
 export type Source = "greenhouse" | "lever" | "ashby";
-export type Verdict = "strong" | "stretch" | "skip";
+// Verdict order is meaningful — "strong" > "good" > "stretch" > "skip".
+// "good" is the new median between confident apply and gap-filled stretch.
+export type Verdict = "strong" | "good" | "stretch" | "skip";
 
 /**
  * User-supplied filter overrides for a single hunt invocation.

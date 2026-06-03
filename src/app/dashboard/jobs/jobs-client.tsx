@@ -12,6 +12,7 @@ type StatusFilter = "all" | "scored" | "unscored" | Verdict;
 
 const VERDICT_PILL: Record<Verdict, string> = {
   strong: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  good: "bg-sky-500/15 text-sky-400 border-sky-500/30",
   stretch: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   skip: "bg-muted-foreground/10 text-muted-foreground border-border",
 };
@@ -56,7 +57,10 @@ export function JobsClient() {
       if (filter === "scored" && !j.aiVerdict) return false;
       if (filter === "unscored" && j.aiVerdict) return false;
       if (
-        (filter === "strong" || filter === "stretch" || filter === "skip") &&
+        (filter === "strong" ||
+          filter === "good" ||
+          filter === "stretch" ||
+          filter === "skip") &&
         j.aiVerdict !== filter
       )
         return false;

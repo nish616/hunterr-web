@@ -14,7 +14,10 @@ const TOTAL_COMPANIES =
   ATS_CONFIG.lever.length +
   ATS_CONFIG.ashby.length;
 
-const VERDICT_RANK = { strong: 3, stretch: 2, skip: 1 } as const;
+// Ranks define the sort order of jobs in the dashboard. Higher = first.
+// "good" sits between "strong" and "stretch" — leave a gap so future tiers
+// can be inserted without renumbering.
+const VERDICT_RANK = { strong: 4, good: 3, stretch: 2, skip: 1 } as const;
 
 function rank(jobs: Job[]): Job[] {
   return [...jobs].sort((a, b) => {

@@ -94,12 +94,16 @@ const TOTAL_COMPANIES =
 
 const VERDICT_LABEL: Record<Verdict, string> = {
   strong: "⭐ Strong matches",
+  good: "🟢 Good matches",
   stretch: "🟡 Stretch",
   skip: "⚫ Skip",
 };
 
 const VERDICT_PILL: Record<Verdict, string> = {
+  // emerald → confident "definitely apply"
   strong: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  // sky → still positive, distinguishable from strong at a glance
+  good: "bg-sky-500/15 text-sky-400 border-sky-500/30",
   stretch: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   skip: "bg-muted-foreground/10 text-muted-foreground border-border",
 };
@@ -389,7 +393,7 @@ export function DashboardClient({
 
       {status === "done" && result && filteredJobs.length > 0 && (
         <div className="space-y-10">
-          {(["strong", "stretch", "skip"] as Verdict[]).map((verdict) =>
+          {(["strong", "good", "stretch", "skip"] as Verdict[]).map((verdict) =>
             grouped[verdict].length > 0 ? (
               <VerdictSection
                 key={verdict}
@@ -756,13 +760,15 @@ function countCompanies(jobs: Job[]): number {
 
 function groupByVerdict(jobs: Job[]): {
   strong: Job[];
+  good: Job[];
   stretch: Job[];
   skip: Job[];
   unscored: Job[];
 } {
-  const groups = { strong: [] as Job[], stretch: [] as Job[], skip: [] as Job[], unscored: [] as Job[] };
+  const groups = { strong: [] as Job[], good: [] as Job[], stretch: [] as Job[], skip: [] as Job[], unscored: [] as Job[] };
   for (const j of jobs) {
     if (j.aiVerdict === "strong") groups.strong.push(j);
+    else if (j.aiVerdict === "good") groups.good.push(j);
     else if (j.aiVerdict === "stretch") groups.stretch.push(j);
     else if (j.aiVerdict === "skip") groups.skip.push(j);
     else groups.unscored.push(j);
