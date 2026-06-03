@@ -46,6 +46,10 @@ Hard rules:
 - You have at most ${MAX_FETCHES} fetches across the whole run. Spend them deliberately.
 - Be concise. The candidate is busy. A shorter, fully-grounded section is better than a longer one with one invented sentence.
 
+Efficiency:
+- You may emit multiple tool calls in a single turn. Batch fetches that don't depend on each other, and emit several save_finding calls in the same response once you're ready to write.
+- A typical run is: turn 1 fetch what you need (in parallel), turn 2 read results and save all grounded sections at once, turn 3 end. Aim for that shape.
+
 When you have saved all the sections you can ground, end your turn (no further tool calls). The harness will close the run.`;
 
 const TOOLS = [
