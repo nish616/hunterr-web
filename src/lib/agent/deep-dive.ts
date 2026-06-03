@@ -29,7 +29,7 @@ const SYSTEM_PROMPT = `You are a job-application research agent. Given one job p
 
 Produce up to four sections by calling save_finding once per section:
 - company_brief — what the company does, stage/funding, recent news, leadership, red flags. ~150 words.
-- deep_gap_analysis — specific overlaps and gaps between this candidate's resume and this JD. Cite exact phrases from both. ~200 words.
+- deep_gap_analysis — specific overlaps and gaps between this candidate's resume and this JD. Cite exact phrases from both. ~200 words. Use two subsections, **Strong overlaps** and **Gaps**, each rendered as a bullet list (one bullet per item, each bullet 1-2 sentences). Do NOT use markdown tables — the renderer does not support them and the output will be unreadable.
 - cover_letter — a tailored cover letter draft (~250 words). Concrete, no platitudes.
 - resume_rewrites — 3-6 actionable items, before/after style. Two kinds are allowed:
     (a) REWRITE — pick an existing bullet from the candidate's resume and fold in specific signals from the JD (named tech, scale, hiring buzzphrases). No generic verb-swapping ("designed" → "architected" is useless). Do not invent stack details the candidate didn't use.
@@ -43,7 +43,27 @@ Hard rules:
 - Use fetch_url only on URLs you can name directly: the JD URL, and the candidate's GitHub / portfolio links if set.
 - Cite sources inline as [domain.com] for every fetched fact, and [JD] or [resume] for facts from those.
 - You have at most ${MAX_FETCHES} fetches across the whole run. Spend them deliberately.
+- Do not fetch the same URL more than once in a run. Page content does not change between turns of a single dive. If you already fetched a URL, the prior tool_result is still valid — refer back to it instead of issuing a duplicate fetch. The harness will short-circuit duplicates and return the cached body, but it wastes a turn and clutters the activity log.
 - Be concise. The candidate is busy. A shorter, fully-grounded section is better than a longer one with one invented sentence.
+- Two rules about meta-commentary, both equally hard:
+
+  (1) If you cannot produce a useful section, DO NOT call save_finding for it. Silent skip.
+
+  (2) When you DO save a section, the body must read as confident, final, user-facing output. The candidate sees only the saved sections — they do NOT see your reasoning about your data, your tools, your fetches, or your limitations. Even when you have partial information, write only from what you DO have, with the same voice you would use if the information was complete. Never add prefaces, notes, footnotes, or asides explaining what you couldn't fetch, what was JavaScript-rendered, what sources were unavailable, what you decided not to assert, what the JD didn't say, why the analysis is "based on" certain inputs, or anything else describing your research process.
+
+  Specifically banned — never include any sentence resembling these patterns in saved section bodies, even at the top or as a "Note:":
+  * "Note: The JD body could not be retrieved..."
+  * "...is JavaScript-rendered and returned only CSS..."
+  * "The analysis below is based on..."
+  * "Per the hard rules of this report..."
+  * "Sources were unavailable..."
+  * "Without access to..."
+  * "Given the limited information..."
+  * Any "Note:" preface to a section body, in any framing.
+
+  If you only have the role title and location to work with for a section like deep_gap_analysis, that's fine — write the analysis using the role title, location, and the candidate's resume, in confident voice. If even that isn't enough to produce something useful, skip the section entirely (rule 1). There is no third option with a disclaimer.
+- Formatting: use only markdown headings (#, ##), paragraphs, bullet lists (- ...), **bold**, *italic*, inline code spans, and [text](url) links. Do NOT use markdown tables (pipe-separated rows) — the panel's renderer does not support them and your output will appear as literal pipe characters and dashes. When you want to compare two columns of items, use a bullet list with bolded labels instead (e.g. "- **JD requirement:** ... Resume evidence: ...").
+- The cover_letter and resume_rewrites sections must not contain em-dashes (—) anywhere. Em-dashes are a recognizable LLM tell and these sections will be read by recruiters, so they need to feel like a human wrote them. Use periods, commas, parentheses, or semicolons instead. Other sections (company_brief, deep_gap_analysis) may use em-dashes normally.
 
 Efficiency:
 - You may emit multiple tool calls in a single turn. Batch fetches that don't depend on each other, and emit several save_finding calls in the same response once you're ready to write.
@@ -115,7 +135,7 @@ async function loadResumeContext(userId: string): Promise<string> {
   if (prefs.githubUrl) linkLines.push(`GitHub: ${prefs.githubUrl}`);
   if (prefs.portfolioUrl) linkLines.push(`Portfolio: ${prefs.portfolioUrl}`);
   const linksBlock = linkLines.length
-    ? `\n\n## Candidate Links\n\n${linkLines.join("\n")}\n\nYou may reference these in the cover letter and may fetch_url any of them to read more about the candidate.`
+    ? `\n\n## Candidate Links\n\n${linkLines.join("\n")}\n\nYou may reference these in the cover letter. You may fetch_url the GitHub and Portfolio URLs to read more about the candidate. DO NOT fetch_url the LinkedIn URL — LinkedIn blocks programmatic requests with 999/403 responses and returns a login wall instead of profile content. Reference the LinkedIn URL only as a fact (e.g. in the cover letter); do not try to fetch its contents.`
     : "";
   return `## Candidate Profile (structured)\n\n${profile}\n\n## Candidate Resume (raw)\n\n${resume}${linksBlock}`;
 }
@@ -126,6 +146,24 @@ type ToolOutcome = {
   content: string;
   section?: { kind: DeepDiveSectionKind; content: string };
 };
+
+/**
+ * Hosts that aggressively block programmatic requests. LinkedIn is the only
+ * one we care about today (999 for unauthenticated user-agents, login-wall
+ * redirects otherwise). Add others here as we discover them.
+ */
+const BLOCKED_HOST_PATTERNS: RegExp[] = [
+  /(?:^|\.)linkedin\.com$/i,
+];
+
+function isBlockedHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return BLOCKED_HOST_PATTERNS.some((re) => re.test(host));
+  } catch {
+    return false;
+  }
+}
 
 async function runFetchUrl(url: string): Promise<ToolOutcome> {
   if (!/^https?:\/\//i.test(url)) {
@@ -153,20 +191,107 @@ async function runFetchUrl(url: string): Promise<ToolOutcome> {
   }
 }
 
+/**
+ * Strip "Note:" prefixes and disclaimer sentences from section content
+ * before persisting. The model has very strong RLHF training to be
+ * transparent about uncertainty, which manifests as preface notes about
+ * what couldn't be fetched, what was JavaScript-rendered, etc. The
+ * prompt asks the model not to do this; this function enforces it.
+ *
+ * Two-pass filter:
+ *   (1) Drop any LINE that starts with "Note:", "Disclaimer:", or "Caveat:"
+ *       (handles "> Note: ..." blockquote prefaces too).
+ *   (2) Drop any SENTENCE matching known disclaimer phrasings, then drop
+ *       any paragraph that becomes empty after sentence-filtering.
+ *
+ * Patterns are intentionally broad — false positives on candidate-facing
+ * prose using these phrases are extremely unlikely.
+ */
+function stripMetaCommentary(content: string): string {
+  const linePrefixPatterns: RegExp[] = [
+    /^>?\s*\*{0,2}\s*(?:Note|Disclaimer|Caveat|Important|Heads[ -]?up)\s*\*{0,2}\s*:/i,
+  ];
+
+  const sentencePatterns: RegExp[] = [
+    /javascript[\s-]?rendered/i,
+    /js[\s-]?rendered/i,
+    /could not (?:be )?retriev/i,
+    /could not (?:be )?fetch/i,
+    /could not (?:be )?access/i,
+    /the analysis below is based on/i,
+    /per the hard rules/i,
+    /returned only (?:css|js|javascript|html|a |the |bundle)/i,
+    /returned no (?:body |readable )?(?:text|content)/i,
+    /returned (?:only |just )(?:a |the )?(?:css|bundle)/i,
+    /(?:without|with limited|with no) (?:direct )?access to/i,
+    /given the limited (?:information|context|details|content)/i,
+    /sources (?:were|are) (?:unavailable|inaccessible)/i,
+    /based on the confirmed role title/i,
+    /the (?:job description|JD)(?:'s)? (?:page|body|content) (?:could not be|was not|wasn't)/i,
+    /(?:JD|job description) (?:page |body |content )?(?:could not|wasn't|was not) (?:retrieved|fetched|accessed)/i,
+    /this assessment is (?:provisional|preliminary|limited)/i,
+    /(?:since|because) the (?:JD|job description|page) (?:could not|was|returned)/i,
+  ];
+
+  // Pass 1: line-level prefix drops.
+  const linesKept = content
+    .split("\n")
+    .filter((line) => !linePrefixPatterns.some((p) => p.test(line.trim())));
+
+  // Pass 2: sentence-level filter within each paragraph.
+  const paragraphs = linesKept.join("\n").split(/\n{2,}/);
+  const cleanedParagraphs = paragraphs
+    .map((para) => {
+      const sentences = para.split(/(?<=[.!?])\s+/);
+      const kept = sentences.filter(
+        (s) => !sentencePatterns.some((p) => p.test(s)),
+      );
+      return kept.join(" ").trim();
+    })
+    .filter((p) => p.length > 0);
+
+  return cleanedParagraphs.join("\n\n").trim();
+}
+
 function runSaveFinding(input: Record<string, unknown>): ToolOutcome {
   const kind = input.kind as DeepDiveSectionKind;
-  const content = typeof input.content === "string" ? input.content : "";
+  const rawContent = typeof input.content === "string" ? input.content : "";
   if (!kind || !VALID_SECTIONS.includes(kind)) {
     return { ok: false, preview: "bad kind", content: `Unknown section kind. Must be one of: ${VALID_SECTIONS.join(", ")}.` };
   }
-  if (!content.trim()) {
+  if (!rawContent.trim()) {
     return { ok: false, preview: "empty", content: "content was empty." };
   }
+
+  // Strip "Note:" prefaces and disclaimer sentences before persisting.
+  const cleaned = stripMetaCommentary(rawContent);
+
+  if (!cleaned.trim()) {
+    return {
+      ok: false,
+      preview: "all meta",
+      content:
+        "Your section body was entirely meta-commentary (Notes about JS-rendered pages, fetch failures, limited info, etc.) and was rejected. Rewrite using only what you DO have, in confident user-facing voice — no Notes, no caveats, no references to fetch results. If you can't produce useful content without disclaimers, do not call save_finding for this section.",
+    };
+  }
+
+  // If the sanitizer removed substantial content, warn the model so it
+  // tightens up future saves in this run (other sections still pending).
+  const trimmedRatio = cleaned.length / rawContent.length;
+  if (trimmedRatio < 0.7 && rawContent.length > 200) {
+    return {
+      ok: true,
+      preview: `${kind} (cleaned)`,
+      content: `Saved section "${kind}", but the harness stripped a substantial amount of meta-commentary from your body before saving. Future save_finding calls in this run: do not include "Note:" prefaces, sentences about JavaScript-rendered pages, "could not be retrieved", "the analysis below is based on", "given the limited information", or similar disclaimer language. Write in confident user-facing voice.`,
+      section: { kind, content: cleaned },
+    };
+  }
+
   return {
     ok: true,
     preview: kind,
     content: `Saved section "${kind}".`,
-    section: { kind, content },
+    section: { kind, content: cleaned },
   };
 }
 
@@ -211,6 +336,11 @@ export async function runDeepDive({
   let iteration = 0;
   let fetches = 0;
   const saved = new Set<DeepDiveSectionKind>();
+  // Cache successful (and failed) fetches within this run. Models sometimes
+  // re-request a URL after a few turns ("am I sure the GitHub didn't change?")
+  // — returning the cached result keeps the conversation correct without
+  // burning another slot from the candidate's MAX_FETCHES budget.
+  const fetchCache = new Map<string, ToolOutcome>();
 
   while (iteration < MAX_ITERATIONS) {
     iteration++;
@@ -262,7 +392,27 @@ export async function runDeepDive({
 
       let outcome: ToolOutcome;
       if (name === "fetch_url") {
-        if (fetches >= MAX_FETCHES) {
+        const u = typeof input.url === "string" ? input.url : "";
+        if (isBlockedHost(u)) {
+          // Short-circuit known-blocked hosts BEFORE incrementing the fetch
+          // budget — we know they'll fail, and we don't want a guaranteed
+          // dud to eat one of the candidate's 5 fetches.
+          outcome = {
+            ok: false,
+            preview: "blocked",
+            content:
+              "This host blocks programmatic fetches (LinkedIn returns 999/403/login-wall). Do not retry this URL. If the candidate's LinkedIn URL is the issue, reference it as a fact in the cover letter without fetching it.",
+          };
+        } else if (fetchCache.has(u)) {
+          // Duplicate fetch within this run. Return the cached outcome with a
+          // strong nudge so the model stops trying to refresh the same URL.
+          const cached = fetchCache.get(u)!;
+          outcome = {
+            ok: cached.ok,
+            preview: "cached",
+            content: `You already fetched this URL earlier in this run. The prior result is unchanged within a single dive. Do not fetch the same URL again. Original result:\n\n${cached.content}`,
+          };
+        } else if (fetches >= MAX_FETCHES) {
           outcome = {
             ok: false,
             preview: "cap",
@@ -270,8 +420,10 @@ export async function runDeepDive({
           };
         } else {
           fetches++;
-          const u = typeof input.url === "string" ? input.url : "";
           outcome = await runFetchUrl(u);
+          // Cache both successes and failures so the model doesn't burn slots
+          // retrying a URL that failed once.
+          fetchCache.set(u, outcome);
         }
       } else if (name === "save_finding") {
         outcome = runSaveFinding(input);

@@ -106,6 +106,12 @@ export function DeepDivePanel({ job, onClose }: DeepDivePanelProps) {
       name: ToolName;
       input: Record<string, unknown>;
     } | null = null;
+    // Track URLs we've already surfaced in the activity log. If the agent
+    // re-fetches a URL (the server still returns a cached result), we
+    // suppress the duplicate line so the user doesn't see the same fetch
+    // listed twice. Pendingtool is left null so the matching tool_result
+    // also gets ignored.
+    const seenFetchUrls = new Set<string>();
 
     try {
       const res = await fetch("/api/jobs/deep-dive", {
@@ -163,6 +169,19 @@ export function DeepDivePanel({ job, onClose }: DeepDivePanelProps) {
           }
           break;
         case "tool_use":
+          // Suppress duplicate fetches of the same URL — the server returns
+          // the cached body anyway, but the user shouldn't see the same
+          // "Looked at X" line appear twice in the activity log.
+          if (event.name === "fetch_url") {
+            const url =
+              typeof event.input.url === "string" ? event.input.url : "";
+            if (seenFetchUrls.has(url)) {
+              // Leave pendingTool null so the matching tool_result is
+              // silently dropped instead of replacing some other line.
+              break;
+            }
+            seenFetchUrls.add(url);
+          }
           pendingTool = { name: event.name, input: event.input };
           push(null, describeAction(pendingTool, null));
           break;
@@ -190,13 +209,13 @@ export function DeepDivePanel({ job, onClose }: DeepDivePanelProps) {
   }, [job, reset]);
 
   /**
-   * Render a single activity line as plain English. The user doesn't care
-   * about tool names, character counts, or HTTP status codes — they want
-   * to know what the agent is doing right now and what it just finished.
+   * Render a single activity line with a leading icon and a phrase that
+   * matches what the agent is actually doing — not what the tool is called.
+   * Fetches get 📖, saves get ✍️, errors get ⚠️.
    *
-   * - ok === null  →  in-progress ("Reading …", "Writing …")
-   * - ok === true  →  past tense  ("Read", "Wrote")
-   * - ok === false →  failure     ("Couldn't read …")
+   * - ok === null  →  in-progress ("📖 Skimming …", "✍️ Drafting …")
+   * - ok === true  →  past tense  ("📖 Read …", "✍️ Wrote …")
+   * - ok === false →  failure     ("⚠️ Couldn't reach …")
    */
   function describeAction(
     tool: { name: ToolName; input: Record<string, unknown> },
@@ -204,33 +223,95 @@ export function DeepDivePanel({ job, onClose }: DeepDivePanelProps) {
   ): string {
     if (tool.name === "fetch_url") {
       const url = typeof tool.input.url === "string" ? tool.input.url : "";
-      const target = jobUrlLabel(url);
-      if (ok === null) return `Reading ${target}…`;
-      if (ok) return `Read ${target}`;
-      return `Couldn't reach ${target}`;
+      const { target, verb, pastVerb } = fetchPhrases(url);
+      if (ok === null) return `📖 ${verb} ${target}…`;
+      if (ok) return `📖 ${pastVerb} ${target}`;
+      // LinkedIn / other anti-bot hosts are not "unreachable" — they
+      // actively block automated access. Naming the cause helps the user
+      // understand it's not a fixable network glitch.
+      if (/linkedin\.com/i.test(url)) {
+        return `⚠️ LinkedIn blocks external fetches — skipped`;
+      }
+      return `⚠️ Couldn't reach ${target}`;
     }
     if (tool.name === "save_finding") {
       const kind = tool.input.kind as DeepDiveSectionKind | undefined;
-      const label = kind
-        ? SECTION_LABELS[kind].toLowerCase()
-        : "a section";
-      if (ok === null) return `Writing ${label}…`;
-      if (ok) return `Wrote ${label}`;
-      return `Couldn't write ${label}`;
+      const { verb, pastVerb, what } = savePhrases(kind);
+      if (ok === null) return `✍️ ${verb} ${what}…`;
+      if (ok) return `✍️ ${pastVerb} ${what}`;
+      return `⚠️ Couldn't ${verb.toLowerCase()} ${what}`;
     }
     return tool.name;
   }
 
   /**
-   * "boards.greenhouse.io" if we can parse the URL, "the job posting" if
-   * it matches the job URL, and a truncated string as a last resort.
+   * Choose a fetch verb and target phrase based on what kind of URL the
+   * agent is hitting. The candidate's own URLs get personalized phrasing
+   * ("your GitHub" rather than "github.com"); the JD URL gets a friendly
+   * label; everything else falls back to the hostname.
    */
-  function jobUrlLabel(url: string): string {
-    if (job && url === job.url) return "the job posting";
-    try {
-      return new URL(url).hostname.replace(/^www\./, "");
-    } catch {
-      return truncate(url, 30);
+  function fetchPhrases(url: string): {
+    verb: string;
+    pastVerb: string;
+    target: string;
+  } {
+    if (job && url === job.url) {
+      return { verb: "Skimming", pastVerb: "Read", target: "the job posting" };
+    }
+    const host = (() => {
+      try {
+        return new URL(url).hostname.replace(/^www\./, "");
+      } catch {
+        return truncate(url, 30);
+      }
+    })();
+    if (/github\.com/i.test(host)) {
+      return { verb: "Checking", pastVerb: "Checked", target: "your GitHub" };
+    }
+    if (/linkedin\.com/i.test(host)) {
+      return { verb: "Checking", pastVerb: "Checked", target: "your LinkedIn" };
+    }
+    return { verb: "Looking at", pastVerb: "Looked at", target: host };
+  }
+
+  /**
+   * Section-specific verb pairs so the activity line communicates what
+   * kind of work is happening, not just "writing a section." Recruiters
+   * and candidates think in terms of "drafting a cover letter," not
+   * "writing the cover_letter section."
+   */
+  function savePhrases(kind: DeepDiveSectionKind | undefined): {
+    verb: string;
+    pastVerb: string;
+    what: string;
+  } {
+    switch (kind) {
+      case "company_brief":
+        return {
+          verb: "Summarizing",
+          pastVerb: "Summarized",
+          what: "what the company does",
+        };
+      case "deep_gap_analysis":
+        return {
+          verb: "Analyzing",
+          pastVerb: "Analyzed",
+          what: "how you fit the role",
+        };
+      case "cover_letter":
+        return {
+          verb: "Drafting",
+          pastVerb: "Drafted",
+          what: "your cover letter",
+        };
+      case "resume_rewrites":
+        return {
+          verb: "Suggesting",
+          pastVerb: "Suggested",
+          what: "resume tweaks",
+        };
+      default:
+        return { verb: "Writing", pastVerb: "Wrote", what: "a section" };
     }
   }
 
@@ -291,7 +372,9 @@ export function DeepDivePanel({ job, onClose }: DeepDivePanelProps) {
           {status === "running" && (
             <div className="rounded-md border border-border bg-muted/20 p-3 text-xs font-mono space-y-1">
               {activity.length === 0 ? (
-                <div className="text-muted-foreground">starting…</div>
+                <div className="text-muted-foreground">
+                  🤔 Planning the dive…
+                </div>
               ) : (
                 activity.map((l, i) => (
                   <div
