@@ -136,7 +136,8 @@ async function persistSection(
     columns: { sections: true },
   });
   const next = { ...(row?.sections ?? {}), [kind]: { content, savedAt: Date.now() } };
-  db.update(schema.jobDeepDives)
+  await db
+    .update(schema.jobDeepDives)
     .set({ sections: next, updatedAt: new Date() })
     .where(eq(schema.jobDeepDives.id, diveId));
 }

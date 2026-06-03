@@ -23,6 +23,7 @@ export function DeepDivePanel({ job, onClose }: DeepDivePanelProps) {
   const [activity, setActivity] = useState<ActivityLine[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "running" | "complete" | "failed">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   // Buffer sections while the run is in flight; only commit when done.
   const pendingRef = useRef<DeepDiveSections>({});
@@ -31,6 +32,7 @@ export function DeepDivePanel({ job, onClose }: DeepDivePanelProps) {
     setSections({});
     setActivity([]);
     setErrorMsg(null);
+    setCachedAt(null);
     pendingRef.current = {};
   }, []);
 
@@ -54,13 +56,22 @@ export function DeepDivePanel({ job, onClose }: DeepDivePanelProps) {
             status: "running" | "complete" | "failed";
             sections: DeepDiveSections;
             error: string | null;
+            updatedAt: string | Date | null;
           };
         };
         if (cancelled) return;
         if (data.dive) {
-          setSections(data.dive.sections ?? {});
+          const cachedSections = data.dive.sections ?? {};
+          setSections(cachedSections);
           if (data.dive.error) setErrorMsg(data.dive.error);
           setStatus(data.dive.status === "running" ? "idle" : data.dive.status);
+          if (
+            data.dive.status === "complete" &&
+            Object.keys(cachedSections).length > 0 &&
+            data.dive.updatedAt
+          ) {
+            setCachedAt(new Date(data.dive.updatedAt).toISOString());
+          }
         } else {
           setStatus("idle");
         }
@@ -300,6 +311,13 @@ export function DeepDivePanel({ job, onClose }: DeepDivePanelProps) {
             </div>
           )}
 
+          {status !== "running" && cachedAt && hasSections && (
+            <div className="text-xs text-muted-foreground">
+              Showing cached result from {formatRelativeTime(cachedAt)}. Click
+              <span className="text-foreground"> Regenerate</span> to re-run.
+            </div>
+          )}
+
           {status !== "running" &&
             SECTION_ORDER.filter((k) => sections[k]).map((kind) => (
               <SectionBlock
@@ -479,4 +497,22 @@ function Inline({ text }: { text: string }) {
 
 function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
+}
+
+/**
+ * Render an ISO timestamp as "5 minutes ago", "2 hours ago", "3 days ago".
+ * Falls back to a date string for anything older than a week.
+ */
+function formatRelativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms) || ms < 0) return "just now";
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} minute${min === 1 ? "" : "s"} ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hour${hr === 1 ? "" : "s"} ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day} day${day === 1 ? "" : "s"} ago`;
+  return new Date(iso).toLocaleDateString();
 }
