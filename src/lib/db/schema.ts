@@ -37,7 +37,6 @@ export type NewUser = typeof users.$inferInsert;
 
 export type DeepDiveSectionKind =
   | "company_brief"
-  | "tech_stack_reality_check"
   | "deep_gap_analysis"
   | "cover_letter"
   | "resume_rewrites";

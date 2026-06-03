@@ -20,7 +20,6 @@ export type ToolName = "fetch_url" | "save_finding";
 
 export const SECTION_LABELS: Record<DeepDiveSectionKind, string> = {
   company_brief: "Company brief",
-  tech_stack_reality_check: "Tech stack reality check",
   deep_gap_analysis: "Deep gap analysis",
   cover_letter: "Tailored cover letter",
   resume_rewrites: "Resume bullet rewrites",
@@ -28,7 +27,6 @@ export const SECTION_LABELS: Record<DeepDiveSectionKind, string> = {
 
 export const SECTION_ORDER: DeepDiveSectionKind[] = [
   "company_brief",
-  "tech_stack_reality_check",
   "deep_gap_analysis",
   "cover_letter",
   "resume_rewrites",
