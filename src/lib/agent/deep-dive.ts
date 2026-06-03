@@ -24,7 +24,6 @@ const VALID_SECTIONS: DeepDiveSectionKind[] = [
   "deep_gap_analysis",
   "cover_letter",
   "resume_rewrites",
-  "questions_to_ask",
 ];
 
 const SYSTEM_PROMPT = `You are a job-application research agent. Given one job posting and the candidate's resume, your job is to produce a short, fact-grounded deep-dive report.

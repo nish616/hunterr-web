@@ -40,8 +40,7 @@ export type DeepDiveSectionKind =
   | "tech_stack_reality_check"
   | "deep_gap_analysis"
   | "cover_letter"
-  | "resume_rewrites"
-  | "questions_to_ask";
+  | "resume_rewrites";
 
 export interface DeepDiveSection {
   content: string;

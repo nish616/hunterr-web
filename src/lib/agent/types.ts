@@ -24,7 +24,6 @@ export const SECTION_LABELS: Record<DeepDiveSectionKind, string> = {
   deep_gap_analysis: "Deep gap analysis",
   cover_letter: "Tailored cover letter",
   resume_rewrites: "Resume bullet rewrites",
-  questions_to_ask: "Questions to ask them",
 };
 
 export const SECTION_ORDER: DeepDiveSectionKind[] = [
@@ -33,5 +32,4 @@ export const SECTION_ORDER: DeepDiveSectionKind[] = [
   "deep_gap_analysis",
   "cover_letter",
   "resume_rewrites",
-  "questions_to_ask",
 ];
