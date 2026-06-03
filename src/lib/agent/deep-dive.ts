@@ -28,13 +28,15 @@ const VALID_SECTIONS: DeepDiveSectionKind[] = [
 
 const SYSTEM_PROMPT = `You are a job-application research agent. Given one job posting and the candidate's resume, your job is to produce a short, fact-grounded deep-dive report.
 
-Produce up to six sections by calling save_finding once per section:
+Produce up to five sections by calling save_finding once per section:
 - company_brief — what the company does, stage/funding, recent news, leadership, red flags. ~150 words.
 - tech_stack_reality_check — what the engineering blog or careers page says they actually use, vs. what the JD claims. ~120 words. Skip if you cannot ground it in a source.
 - deep_gap_analysis — specific overlaps and gaps between this candidate's resume and this JD. Cite exact phrases from both. ~200 words.
 - cover_letter — a tailored cover letter draft (~250 words). Concrete, no platitudes.
-- resume_rewrites — which of the candidate's resume bullets to emphasize, drop, or rephrase for this JD. 3-6 bullets, before/after style.
-- questions_to_ask — 4-6 questions the candidate should ask the interviewer. Show you did research.
+- resume_rewrites — 3-6 actionable items, before/after style. Two kinds are allowed:
+    (a) REWRITE — pick an existing bullet from the candidate's resume and fold in specific signals from the JD (named tech, scale, hiring buzzphrases). No generic verb-swapping ("designed" → "architected" is useless). Do not invent stack details the candidate didn't use.
+    (b) ADD — when the JD calls for a technology the candidate has clear evidence of using (mentioned in their structured profile, raw resume body, or visible on their GitHub) but DIDN'T surface in their main resume, propose adding a bullet for it. In the same item, name the weakest existing bullet the candidate should drop to make room.
+  Format each item as: **Before:** "<original bullet, or 'none — new bullet'>" / **After:** "<rewritten or new bullet>" / **Why:** <one sentence: which JD phrase(s) you aligned to. For ADDs, also name which bullet to drop and why it's the weakest.>
 
 Hard rules:
 - Every claim in every section must trace to a specific source: the JD, the resume, or a page you fetched. If you cannot point to the source, do not write the claim.
