@@ -22,12 +22,11 @@ Two AI surfaces, each chosen for what it's actually good at.
 
 **Per-job deep dive — an agent** (Claude in a tool-use loop, choosing what to do next):
 
-Click *Deep dive* on any scored job. The agent has three tools — `web_search`,
-`fetch_url`, `save_finding` — and runs up to 10 turns to produce six grounded
-sections:
+Click *Deep dive* on any scored job. The agent has two tools — `fetch_url` and
+`save_finding` — and runs up to 10 turns to produce up to six grounded sections:
 
-- **Company brief** — what they do, stage/funding, recent news, leadership, red flags.
-- **Tech stack reality check** — what the engineering blog/careers page actually says they use, vs. what the JD claims.
+- **Company brief** — what they do, stage/funding, leadership, red flags. Skipped when the JD alone doesn't carry enough signal (no web-search tool).
+- **Tech stack reality check** — what the engineering blog says they use vs. what the JD claims. Skipped unless the JD links somewhere the agent can `fetch_url`.
 - **Deep gap analysis** — concrete overlaps and gaps between your resume and the JD, citing exact phrases from both.
 - **Tailored cover letter** — ~250 words, specific, no platitudes; references your linked GitHub/portfolio when relevant.
 - **Resume bullet rewrites** — which bullets to emphasize, drop, or reword for this JD, in before/after form.
@@ -73,10 +72,6 @@ Create `.env.local`:
 DATABASE_URL=postgresql://...your-neon-connection-string...
 AUTH_SECRET=<openssl rand -base64 32>
 ANTHROPIC_API_KEY=sk-ant-...
-# Optional — enables the deep-dive agent's web_search tool. Without these the
-# agent falls back to fetch_url only.
-GOOGLE_API_KEY=...
-GOOGLE_CSE_ID=...
 ```
 
 Then:

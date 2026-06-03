@@ -16,7 +16,7 @@ export type DeepDiveEvent =
 
 export type DeepDiveEventCallback = (event: DeepDiveEvent) => void;
 
-export type ToolName = "web_search" | "fetch_url" | "save_finding";
+export type ToolName = "fetch_url" | "save_finding";
 
 export const SECTION_LABELS: Record<DeepDiveSectionKind, string> = {
   company_brief: "Company brief",

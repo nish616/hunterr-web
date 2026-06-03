@@ -14,7 +14,6 @@ import type {
 } from "./types";
 
 const MAX_ITERATIONS = 10;
-const MAX_SEARCHES = 5;
 const MAX_FETCHES = 5;
 const FETCH_BYTE_LIMIT = 200_000;
 const FETCH_CHAR_RETURN = 8_000;
@@ -39,29 +38,20 @@ Produce up to six sections by calling save_finding once per section:
 - questions_to_ask — 4-6 questions the candidate should ask the interviewer. Show you did research.
 
 Hard rules:
-- Do not fabricate. If you cannot find facts for a section, skip it rather than invent.
-- Cite sources inline as [example.com] whenever you reference a fact from the web.
-- Use web_search to find URLs, then fetch_url to read the actual page. Prefer the company's own pages (engineering blog, careers, press) over third-party sources.
-- You have at most ${MAX_SEARCHES} web searches and ${MAX_FETCHES} fetches across the whole run. Spend them deliberately.
-- Be concise. The candidate is busy.
+- Every claim in every section must trace to a specific source: the JD, the resume, or a page you fetched. If you cannot point to the source, do not write the claim.
+- Do not extrapolate from stage, geography, or industry. "Series B" does not tell you about product-market fit. "SF-based" does not tell you about culture. If the JD says "Series B fintech," you may write "Series B fintech" — nothing more.
+- You have no web-search tool. company_brief and tech_stack_reality_check will be skipped on this run unless you can ground them in a page you fetch_url'd. Do not attempt them from the JD alone.
+- Use fetch_url only on URLs you can name directly: the JD URL, and the candidate's GitHub / portfolio links if set.
+- Cite sources inline as [domain.com] for every fetched fact, and [JD] or [resume] for facts from those.
+- You have at most ${MAX_FETCHES} fetches across the whole run. Spend them deliberately.
+- Be concise. The candidate is busy. A shorter, fully-grounded section is better than a longer one with one invented sentence.
 
 When you have saved all the sections you can ground, end your turn (no further tool calls). The harness will close the run.`;
 
 const TOOLS = [
   {
-    name: "web_search",
-    description: "Search the web. Returns up to 5 result snippets with URLs. Use to discover company pages, engineering blogs, news.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        query: { type: "string", description: "A specific factual query." },
-      },
-      required: ["query"],
-    },
-  },
-  {
     name: "fetch_url",
-    description: "Fetch a URL and return up to ~8000 characters of plain text (HTML stripped). Use after web_search to read a specific page.",
+    description: "Fetch a URL and return up to ~8000 characters of plain text (HTML stripped). Use on URLs you can name directly: the JD URL, the candidate's GitHub / portfolio links.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -134,48 +124,6 @@ type ToolOutcome = {
   section?: { kind: DeepDiveSectionKind; content: string };
 };
 
-async function runWebSearch(query: string): Promise<ToolOutcome> {
-  const key = process.env.GOOGLE_API_KEY;
-  const cx = process.env.GOOGLE_CSE_ID;
-  if (!key || !cx) {
-    return {
-      ok: false,
-      preview: "search unavailable (no GOOGLE_API_KEY/GOOGLE_CSE_ID)",
-      content: "Web search is not configured on this server. Use fetch_url with URLs you can guess (company root domain, /careers, /blog) instead.",
-    };
-  }
-  const api = new URL("https://www.googleapis.com/customsearch/v1");
-  api.searchParams.set("key", key);
-  api.searchParams.set("cx", cx);
-  api.searchParams.set("q", query);
-  api.searchParams.set("num", "5");
-  try {
-    const res = await fetch(api, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) {
-      const body = await res.text();
-      return { ok: false, preview: `cse ${res.status}`, content: `Search failed: ${res.status} ${body.slice(0, 200)}` };
-    }
-    const json = (await res.json()) as {
-      items?: { title?: string; link?: string; snippet?: string }[];
-    };
-    const items = (json.items ?? []).slice(0, 5);
-    if (items.length === 0) {
-      return { ok: true, preview: "0 results", content: "No results." };
-    }
-    const lines = items.map(
-      (it, i) => `${i + 1}. ${it.title ?? "(no title)"}\n   ${it.link ?? ""}\n   ${it.snippet ?? ""}`,
-    );
-    return {
-      ok: true,
-      preview: `${items.length} results`,
-      content: lines.join("\n\n"),
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, preview: "search error", content: `Search error: ${msg}` };
-  }
-}
-
 async function runFetchUrl(url: string): Promise<ToolOutcome> {
   if (!/^https?:\/\//i.test(url)) {
     return { ok: false, preview: "bad url", content: "URL must start with http:// or https://." };
@@ -203,7 +151,7 @@ async function runFetchUrl(url: string): Promise<ToolOutcome> {
 }
 
 function runSaveFinding(input: Record<string, unknown>): ToolOutcome {
-  const kind = input.section as DeepDiveSectionKind | undefined;
+  const kind = input.kind as DeepDiveSectionKind;
   const content = typeof input.content === "string" ? input.content : "";
   if (!kind || !VALID_SECTIONS.includes(kind)) {
     return { ok: false, preview: "bad kind", content: `Unknown section kind. Must be one of: ${VALID_SECTIONS.join(", ")}.` };
@@ -258,7 +206,6 @@ export async function runDeepDive({
   ];
 
   let iteration = 0;
-  let searches = 0;
   let fetches = 0;
   const saved = new Set<DeepDiveSectionKind>();
 
@@ -284,7 +231,7 @@ export async function runDeepDive({
       } as unknown as Anthropic.MessageCreateParamsNonStreaming);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      onEvent({ type: "error", message: `Anthropic call failed: ${msg}` });
+      onEvent({ type: "error", message: `${msg}` });
       return;
     }
 
@@ -311,19 +258,7 @@ export async function runDeepDive({
       onEvent({ type: "tool_use", name, input });
 
       let outcome: ToolOutcome;
-      if (name === "web_search") {
-        if (searches > MAX_SEARCHES) {
-          outcome = {
-            ok: false,
-            preview: "cap",
-            content: `Web-search budget exhausted (${MAX_SEARCHES}). Use fetch_url or write up what you already have.`,
-          };
-        } else {
-          searches++;
-          const q = typeof input.query === "string" ? input.query : "";
-          outcome = await runWebSearch(q);
-        }
-      } else if (name === "fetch_url") {
+      if (name === "fetch_url") {
         if (fetches >= MAX_FETCHES) {
           outcome = {
             ok: false,
@@ -362,7 +297,7 @@ export async function runDeepDive({
 
       toolResults.push({
         type: "tool_result",
-        tool_use_id: block.name,
+        tool_use_id: block.id,
         content: outcome.content,
         is_error: !outcome.ok,
       });
