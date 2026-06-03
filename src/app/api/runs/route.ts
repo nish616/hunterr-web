@@ -76,6 +76,8 @@ export async function POST(req: Request) {
           type: "error",
           message: err instanceof Error ? err.message : "Hunt failed",
         });
+      } finally {
+        controller.close();
       }
     },
   });
