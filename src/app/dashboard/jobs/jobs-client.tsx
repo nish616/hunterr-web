@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { loadCachedRun, type CachedRun } from "@/lib/run-cache";
 import type { Job, Verdict } from "@/lib/hunt/types";
+import type { Subscription } from "@/lib/db/schema";
+import { isPro, upgradeRequestMailto } from "@/lib/subscription";
 import { DeepDivePanel } from "./deep-dive-panel";
 
 type StatusFilter = "all" | "scored" | "unscored" | Verdict;
@@ -37,7 +39,15 @@ function postedLabel(postedAt: string): string {
   return `${Math.floor(days / 7)}w`;
 }
 
-export function JobsClient() {
+export function JobsClient({
+  subscription,
+  userEmail,
+}: {
+  subscription: Subscription;
+  userEmail: string;
+}) {
+  const isProUser = isPro(subscription.tier);
+  const upgradeHref = upgradeRequestMailto(userEmail);
   const [run, setRun] = useState<CachedRun | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
@@ -179,6 +189,8 @@ export function JobsClient() {
                 key={`${j.company}-${j.url}-${i}`}
                 job={j}
                 onDeepDive={() => setDiveJob(j)}
+                isProUser={isProUser}
+                upgradeHref={upgradeHref}
               />
             ))}
           </tbody>
@@ -195,7 +207,17 @@ export function JobsClient() {
   );
 }
 
-function JobRow({ job, onDeepDive }: { job: Job; onDeepDive: () => void }) {
+function JobRow({
+  job,
+  onDeepDive,
+  isProUser,
+  upgradeHref,
+}: {
+  job: Job;
+  onDeepDive: () => void;
+  isProUser: boolean;
+  upgradeHref: string;
+}) {
   return (
     <tr className="border-t border-border hover:bg-muted/20">
       <td className="px-4 py-3 align-top whitespace-nowrap">
@@ -232,14 +254,24 @@ function JobRow({ job, onDeepDive }: { job: Job; onDeepDive: () => void }) {
       </td>
       <td className="px-4 py-3 align-top text-right whitespace-nowrap">
         <div className="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onDeepDive}
-            title="Runs an AI agent that researches the company, drafts a tailored cover letter, and suggests resume rewrites for this role. ~30–90s."
-            className="text-sm font-medium text-muted-foreground hover:text-foreground"
-          >
-            Deep dive
-          </button>
+          {isProUser ? (
+            <button
+              type="button"
+              onClick={onDeepDive}
+              title="Runs an AI agent that researches the company, drafts a tailored cover letter, and suggests resume rewrites for this role. ~30–90s."
+              className="text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
+              Deep dive
+            </button>
+          ) : (
+            <a
+              href={upgradeHref}
+              title="Deep dive is a Pro feature. Click to request an upgrade."
+              className="text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
+              Deep dive 🔒
+            </a>
+          )}
           <a
             href={job.url}
             target="_blank"

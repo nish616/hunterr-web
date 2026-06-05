@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db, schema } from "@/lib/db";
 import { runDeepDive } from "@/lib/agent/deep-dive";
+import { isPro } from "@/lib/subscription";
+import { getSubscription } from "@/lib/subscription-server";
 import type { DeepDiveEvent } from "@/lib/agent/types";
 import type { Job } from "@/lib/hunt/types";
 
@@ -27,6 +29,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
+
+  const subscription = await getSubscription(userId);
+  if (!isPro(subscription.tier)) {
+    return NextResponse.json(
+      {
+        error: "Deep dive requires Pro. Request an upgrade to enable it.",
+      },
+      { status: 403 },
+    );
+  }
 
   const body = (await req.json().catch(() => ({}))) as { job?: unknown };
   if (!isJob(body.job)) {

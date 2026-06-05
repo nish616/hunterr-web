@@ -17,6 +17,7 @@
     "db:studio": "drizzle-kit studio",
     "create-user": "tsx --env-file=.env.local scripts/create-user.ts",
     "discover": "tsx --env-file=.env.local scripts/discover.ts",
+    "migrate-subscriptions": "tsx --env-file=.env.local scripts/migrate-subscriptions.ts",
     "migrate": "tsx --env-file=.env.local scripts/migrate-to-postgres.ts"
   },
   "dependencies": {

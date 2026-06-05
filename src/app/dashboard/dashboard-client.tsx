@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ATS_CONFIG } from "@/lib/hunt/config";
-import type { UserPreferences } from "@/lib/db/schema";
+import type { Subscription, UserPreferences } from "@/lib/db/schema";
+import { isPro, upgradeRequestMailto } from "@/lib/subscription";
 import type {
   HuntProgress,
   Job,
@@ -110,14 +111,21 @@ const VERDICT_PILL: Record<Verdict, string> = {
 
 export function DashboardClient({
   initialPreferences,
+  subscription,
+  userEmail,
 }: {
   initialPreferences: UserPreferences;
+  subscription: Subscription;
+  userEmail: string;
 }) {
+  const isProUser = isPro(subscription.tier);
+  const upgradeHref = upgradeRequestMailto(userEmail);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [progress, setProgress] = useState<ProgressState | null>(null);
+  const [aiEnabled, setAiEnabled] = useState<boolean>(isProUser);
   const [selectedSources, setSelectedSources] = useState<Set<Source>>(
     () => new Set(ALL_SOURCES),
   );
@@ -188,12 +196,12 @@ export function DashboardClient({
     });
   }
 
-  async function runHunt() {
+  async function runHunt(withAi: boolean = true) {
     setStatus("running");
     setError(null);
     setProgress(null);
     try {
-      const res = await fetch("/api/runs", {
+      const res = await fetch(`/api/runs?ai=${withAi}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -316,13 +324,48 @@ export function DashboardClient({
             )}
           </p>
         </div>
-        <Button
-          size="lg"
-          onClick={runHunt}
-          disabled={status === "running" || needsConfig}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <AiToggle
+            enabled={aiEnabled}
+            onChange={setAiEnabled}
+            disabled={!isProUser || status === "running"}
+            disabledTitle={
+              !isProUser
+                ? "AI scoring requires Pro — request an upgrade"
+                : undefined
+            }
+          />
+          <Button
+            size="lg"
+            onClick={() => runHunt(aiEnabled)}
+            disabled={status === "running" || needsConfig}
+          >
+            {status === "running" ? "Running hunt…" : "Run hunt"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Tier badge + upgrade nudge, just below the hunt buttons. */}
+      <div className="mb-4 flex items-center gap-3 text-sm">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+            isProUser
+              ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+              : "bg-muted-foreground/10 text-muted-foreground border-border",
+          )}
         >
-          {status === "running" ? "Running hunt…" : "Run new hunt"}
-        </Button>
+          <span className="size-1.5 rounded-full bg-current" />
+          {isProUser ? "Pro" : "Free"}
+        </span>
+        {!isProUser && (
+          <a
+            href={upgradeHref}
+            className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Request upgrade →
+          </a>
+        )}
       </div>
 
       {needsConfig && (
@@ -402,6 +445,8 @@ export function DashboardClient({
                 jobs={grouped[verdict]}
                 defaultOpen={verdict !== "skip"}
                 onDeepDive={setDiveJob}
+                isProUser={isProUser}
+                upgradeHref={upgradeHref}
               />
             ) : null,
           )}
@@ -413,6 +458,8 @@ export function DashboardClient({
               jobs={grouped.unscored}
               defaultOpen={false}
               onDeepDive={setDiveJob}
+              isProUser={isProUser}
+              upgradeHref={upgradeHref}
             />
           )}
         </div>
@@ -430,6 +477,8 @@ function VerdictSection({
   jobs,
   defaultOpen,
   onDeepDive,
+  isProUser,
+  upgradeHref,
 }: {
   title: string;
   note?: string;
@@ -437,6 +486,8 @@ function VerdictSection({
   jobs: Job[];
   defaultOpen: boolean;
   onDeepDive: (job: Job) => void;
+  isProUser: boolean;
+  upgradeHref: string;
 }) {
   return (
     <details open={defaultOpen} className="group">
@@ -459,6 +510,8 @@ function VerdictSection({
             job={j}
             pillClass={pillClass}
             onDeepDive={() => onDeepDive(j)}
+            isProUser={isProUser}
+            upgradeHref={upgradeHref}
           />
         ))}
       </div>
@@ -470,16 +523,15 @@ function JobCard({
   job,
   pillClass,
   onDeepDive,
+  isProUser,
+  upgradeHref,
 }: {
   job: Job;
   pillClass: string;
   onDeepDive: () => void;
+  isProUser: boolean;
+  upgradeHref: string;
 }) {
-  // content-visibility:auto lets the browser skip layout/paint for offscreen
-  // cards. contain-intrinsic-size reserves space so the scrollbar doesn't jump
-  // as cards enter/leave the viewport (220px ≈ typical card height with AI
-  // strengths/gaps; matched-not-scored cards are shorter but the diff is small
-  // enough that the scrollbar settle is imperceptible).
   return (
     <Card className="[content-visibility:auto] [contain-intrinsic-size:auto_220px]">
       <CardHeader>
@@ -500,14 +552,24 @@ function JobCard({
                 {job.aiScore}/10 · {job.aiVerdict}
               </span>
             ) : null}
-            <button
-              type="button"
-              onClick={onDeepDive}
-              title="Runs an AI agent that researches the company, drafts a tailored cover letter, and suggests resume rewrites for this role. ~30–90s."
-              className="text-sm font-medium px-3 py-1.5 rounded-md border border-border text-foreground hover:bg-muted"
-            >
-              Deep dive
-            </button>
+            {isProUser ? (
+              <button
+                type="button"
+                onClick={onDeepDive}
+                title="Runs an AI agent that researches the company, drafts a tailored cover letter, and suggests resume rewrites for this role. ~30–90s."
+                className="text-sm font-medium px-3 py-1.5 rounded-md border border-border text-foreground hover:bg-muted"
+              >
+                Deep dive
+              </button>
+            ) : (
+              <a
+                href={upgradeHref}
+                title="Deep dive is a Pro feature. Click to request an upgrade."
+                className="text-sm font-medium px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+              >
+                Deep dive 🔒
+              </a>
+            )}
             <a
               href={job.url}
               target="_blank"
@@ -733,6 +795,53 @@ function HuntProgressView({ progress }: { progress: ProgressState | null }) {
         This usually takes 30–90 seconds.
       </p>
     </div>
+  );
+}
+
+function AiToggle({
+  enabled,
+  onChange,
+  disabled,
+  disabledTitle,
+}: {
+  enabled: boolean;
+  onChange: (next: boolean) => void;
+  disabled: boolean;
+  disabledTitle?: string;
+}) {
+  return (
+    <label
+      className={cn(
+        "inline-flex items-center gap-2 select-none",
+        disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer",
+      )}
+      title={disabled ? disabledTitle : undefined}
+    >
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!enabled)}
+        className={cn(
+          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
+          enabled && !disabled
+            ? "bg-emerald-500"
+            : "bg-muted-foreground/30",
+          disabled && "cursor-not-allowed",
+        )}
+      >
+        <span
+          className={cn(
+            "inline-block size-5 transform rounded-full bg-background shadow transition-transform",
+            enabled ? "translate-x-5" : "translate-x-0.5",
+          )}
+        />
+      </button>
+      <span className="text-sm font-medium">
+        AI scoring {disabled && !enabled ? "🔒" : ""}
+      </span>
+    </label>
   );
 }
 

@@ -1,5 +1,17 @@
 import { pgTable, text, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 
+export type SubscriptionTier = "free" | "pro";
+
+export interface Subscription {
+  tier: SubscriptionTier;
+  upgradedAt?: string;
+}
+
+/**
+ * Default subscription for a brand-new signup — Free tier, no AI access.
+ */
+export const DEFAULT_SUBSCRIPTION: Subscription = { tier: "free" };
+
 /**
  * Per-user preferences. Stored as JSON so we can add new keys (skills,
  * locations, etc.) later without schema migrations.
@@ -8,10 +20,7 @@ export interface UserPreferences {
   preferredTitles?: string; // comma-separated, raw from input
   excludedTitles?: string;
   skills?: string; // comma-separated; overrides default SKILL_KEYWORDS when set
-  maxAgeDays?: number; // posting age cutoff; 0 = no limit. Overrides default.
-  // Public profile links — surfaced to the deep-dive agent so cover letters can
-  // reference them, and shown on the profile page so the user can copy/paste
-  // them when applying.
+  maxAgeDays?: number;
   linkedinUrl?: string;
   githubUrl?: string;
   portfolioUrl?: string;
@@ -27,6 +36,10 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   // JSON blob; empty / null = use defaults.
   preferences: jsonb("preferences").$type<UserPreferences>(),
+  subscription: jsonb("subscription")
+    .$type<Subscription>()
+    .notNull()
+    .default(DEFAULT_SUBSCRIPTION),
   // Résumé stored in the DB (not on disk) so it survives serverless deploys.
   resumeText: text("resume_text"),
   resumeProfile: text("resume_profile"),

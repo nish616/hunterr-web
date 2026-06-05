@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { runHunt } from "@/lib/hunt/pipeline";
+import { isPro } from "@/lib/subscription";
+import { getSubscription } from "@/lib/subscription-server";
 import type { FilterOverrides, HuntProgress } from "@/lib/hunt/types";
 
 // AI scoring + fetches can take 60-90s; raise the route timeout for local dev.
-// On Vercel Hobby the timeout is hard-capped at 60s, so we'd need to either
-// upgrade or stream — both deferred for now.
+// On Vercel Hobby the timeout is hard-capped at 60s, so both deferred for now.
 export const maxDuration = 300;
 
 function sanitizeList(input: unknown): string[] {
@@ -24,6 +25,20 @@ export async function POST(req: Request) {
 
   const url = new URL(req.url);
   const withAi = url.searchParams.get("ai") !== "false";
+
+  // Tier gate. AI hunts (scoring + triage) require Pro;
+  if (withAi) {
+    const subscription = await getSubscription(session.user.id);
+    if (!isPro(subscription.tier)) {
+      return NextResponse.json(
+        {
+          error:
+            "AI scoring requires Pro. Run without AI, or request an upgrade.",
+        },
+        { status: 403 },
+      );
+    }
+  }
 
   const body = (await req.json().catch(() => ({}))) as {
     filters?: {

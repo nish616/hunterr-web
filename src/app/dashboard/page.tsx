@@ -4,20 +4,22 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import type { UserPreferences } from "@/lib/db/schema";
+import type { Subscription, UserPreferences } from "@/lib/db/schema";
+import { DEFAULT_SUBSCRIPTION } from "@/lib/db/schema";
 import { DashboardClient } from "./dashboard-client";
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) redirect("/signin");
 
-  // Hydrate the client with the user's saved preferences (if any).
+  // Hydrate the client with the user's saved preferences and tier state.
   const row = await db.query.users.findFirst({
     where: eq(schema.users.id, session.user.id),
-    columns: { preferences: true },
+    columns: { preferences: true, subscription: true },
   });
 
   const initialPreferences: UserPreferences = row?.preferences ?? {};
+  const subscription: Subscription = row?.subscription ?? DEFAULT_SUBSCRIPTION;
 
   return (
     <main className="flex-1">
@@ -75,7 +77,11 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <DashboardClient initialPreferences={initialPreferences} />
+      <DashboardClient
+        initialPreferences={initialPreferences}
+        subscription={subscription}
+        userEmail={session.user.email ?? ""}
+      />
     </main>
   );
 }
