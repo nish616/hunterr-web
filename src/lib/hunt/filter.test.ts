@@ -101,6 +101,25 @@ describe("filterAndRank — location matching", () => {
     expect(filterAndRank(jobs, baseFilters)).toHaveLength(0);
   });
 
+  it("drops UK-geofenced remote roles (abbreviation + city)", () => {
+    const jobs = [
+      makeJob({ location: "Remote - UK" }),
+      makeJob({ location: "Remote, London" }),
+      makeJob({ location: "Remote - Manchester" }),
+    ];
+    expect(filterAndRank(jobs, baseFilters)).toHaveLength(0);
+  });
+
+  it("drops US-city-geofenced remote roles", () => {
+    const jobs = [
+      makeJob({ location: "Remote - SF Bay Area" }),
+      makeJob({ location: "Remote, NYC" }),
+      makeJob({ location: "Remote - Boston" }),
+      makeJob({ location: "Remote, Seattle" }),
+    ];
+    expect(filterAndRank(jobs, baseFilters)).toHaveLength(0);
+  });
+
   it("drops jobs in non-India, non-remote locations", () => {
     const jobs = [
       makeJob({ location: "San Francisco, CA" }),

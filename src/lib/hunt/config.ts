@@ -4,10 +4,6 @@
  */
 import discovered from "./discovered.json";
 
-// Every slug below was validated against the live ATS API and confirmed to have
-// at least one India-located posting at the time of adding. Re-validate
-// periodically — boards change and companies migrate ATS providers.
-// This is the hand-curated base; `npm run discover` appends to discovered.json.
 const BASE_ATS_CONFIG = {
   greenhouse: [
     // Indian-HQ
@@ -45,7 +41,6 @@ const BASE_ATS_CONFIG = {
     "vercel",
     "verkada",
     "zscaler",
-    // Discovered via Google `site:boards.greenhouse.io "<city>"` + validated
     "coupang",
     "hackerrank",
     "6sense",
@@ -62,7 +57,6 @@ const BASE_ATS_CONFIG = {
     "cred",
     "spotify",
     "matchgroup",
-    // Discovered via Google `site:jobs.lever.co "<city>"` + validated
     "safe",
     "jumpcloud",
     "vendavo",
@@ -77,7 +71,6 @@ const BASE_ATS_CONFIG = {
     "turvo",
     "elfbeauty",
     "moonpay",
-    // Indian SaaS / unicorns (case-sensitive slugs)
     "Sprinto",
     "meesho",
     "mindtickle",
@@ -96,8 +89,6 @@ const BASE_ATS_CONFIG = {
     "modal",
     "notion",
     "openai",
-    // Discovered via `site:jobs.ashbyhq.com "Bengaluru"` + validated.
-    // NOTE: Ashby slugs are case-sensitive and may contain dots/hyphens.
     "harvey",
     "Almabase",
     "office-hours",
@@ -109,7 +100,6 @@ const BASE_ATS_CONFIG = {
   ],
 };
 
-// Merge curated base + script-discovered slugs, deduped. Order: base first.
 type Source = "greenhouse" | "lever" | "ashby";
 function mergeSlugs(src: Source): string[] {
   const base = BASE_ATS_CONFIG[src] ?? [];
@@ -172,7 +162,6 @@ export const BLOCKED_REMOTE_REGIONS = [
   "netherlands",
   "argentina",
   "brazil",
-  // "US" appearances
   "remote - us",
   "remote-us",
   "remote, us",
@@ -182,24 +171,48 @@ export const BLOCKED_REMOTE_REGIONS = [
   " us:",
   "; us",
   ", us",
+  "remote - uk",
+  "remote-uk",
+  "remote, uk",
+  "uk-remote",
+  ", uk",
+  " uk:",
+  "; uk",
   // Region terms
   "emea",
   "americas",
+  "north america",
+  "latam",
   // US states / Canadian provinces
   "california",
   "colorado",
   "illinois",
   "new york",
   "washington",
+  "massachusetts",
+  "texas",
   "ontario",
   "alberta",
   "british columbia",
+  "san francisco",
+  "sf bay area",
+  "bay area",
+  "los angeles",
+  "new york city",
+  "nyc",
+  "boston",
+  "chicago",
+  "seattle",
+  "austin",
+  "denver",
+  "atlanta",
+  "london",
+  "manchester",
+  "edinburgh",
 ];
 
-// Triage pool: the most keyword-relevant matched jobs are sent to a cheap Haiku
-// triage call, which picks the best AI_SCORE_LIMIT for full Sonnet scoring.
-export const AI_MAX_JOBS_PER_RUN = 80; // max jobs considered (triage pool size)
-export const AI_SCORE_LIMIT = 30; // how many the triage selects for full scoring
+export const AI_MAX_JOBS_PER_RUN = 80; // max jobs 
+export const AI_SCORE_LIMIT = 30; // selects for full scoring
 export const AI_MAX_CONCURRENCY = 4; // parallel Sonnet scoring calls
-export const AI_MODEL = "claude-sonnet-4-6"; // full fit-scoring model
-export const AI_TRIAGE_MODEL = "claude-haiku-4-5"; // cheap relevance-ranking model
+export const AI_MODEL = "claude-sonnet-4-6"; // fit-scoring model
+export const AI_TRIAGE_MODEL = "claude-haiku-4-5"; // relevance-ranking model
