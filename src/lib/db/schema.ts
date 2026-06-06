@@ -1,6 +1,7 @@
 import { pgTable, text, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { Tier } from "../constants";
 
-export type SubscriptionTier = "free" | "pro";
+export type SubscriptionTier = Tier;
 
 export interface Subscription {
   tier: SubscriptionTier;
@@ -10,7 +11,7 @@ export interface Subscription {
 /**
  * Default subscription for a brand-new signup — Free tier, no AI access.
  */
-export const DEFAULT_SUBSCRIPTION: Subscription = { tier: "free" };
+export const DEFAULT_SUBSCRIPTION: Subscription = { tier: Tier.Free };
 
 /**
  * Per-user preferences. Stored as JSON so we can add new keys (skills,

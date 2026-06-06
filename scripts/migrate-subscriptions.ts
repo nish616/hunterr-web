@@ -12,6 +12,7 @@
  * everyone to Pro with a fresh `upgradedAt`. Safe to re-run.
  */
 import { db, schema } from "../src/lib/db";
+import { Tier } from "@/lib/constants";
 
 async function main() {
   const now = new Date().toISOString();
@@ -20,7 +21,7 @@ async function main() {
     .update(schema.users)
     .set({
       subscription: {
-        tier: "pro",
+        tier: Tier.Pro,
         upgradedAt: now,
       },
     })

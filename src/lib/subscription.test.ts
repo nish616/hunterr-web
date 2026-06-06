@@ -4,14 +4,15 @@ import {
   upgradeRequestMailto,
   UPGRADE_REQUEST_EMAIL,
 } from "./subscription";
+import { Tier } from "./constants";
 
 describe("isPro", () => {
   it("returns true for the pro tier", () => {
-    expect(isPro("pro")).toBe(true);
+    expect(isPro(Tier.Pro)).toBe(true);
   });
 
   it("returns false for the free tier", () => {
-    expect(isPro("free")).toBe(false);
+    expect(isPro(Tier.Free)).toBe(false);
   });
 });
 

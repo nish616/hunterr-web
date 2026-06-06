@@ -1,9 +1,10 @@
 import type { SubscriptionTier } from "@/lib/db/schema";
+import { Tier }  from "./constants";
 
 export const UPGRADE_REQUEST_EMAIL = "nishin616@gmail.com";
 
 export function isPro(tier: SubscriptionTier): boolean {
-  return tier === "pro";
+  return tier === Tier.Pro;
 }
 
 export function upgradeRequestMailto(userEmail: string): string {
