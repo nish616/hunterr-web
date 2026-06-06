@@ -18,8 +18,10 @@ export default auth((req) => {
   }
 
   // Redirect away from signin if already authed
-  if (pathname === "/signin" && isAuthed) {
-    return NextResponse.redirect(new URL("/dashboard", req.nextUrl.origin));
+  if (pathname === "/" || pathname === "/signin") {
+    if (isAuthed) {
+      return NextResponse.redirect(new URL("/dashboard", req.nextUrl.origin));
+    }
   }
 
   return NextResponse.next();
