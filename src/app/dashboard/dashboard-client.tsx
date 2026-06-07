@@ -345,7 +345,6 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* Tier badge + upgrade nudge, just below the hunt buttons. */}
       <div className="mb-4 flex items-center gap-3 text-sm">
         <span
           className={cn(
