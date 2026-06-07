@@ -9,7 +9,7 @@ import {
   type CompanyEntry,
 } from "@/lib/hunt/companies";
 import type { Source } from "@/lib/hunt/types";
-import Nav from "@/components/ui/nav";
+import { Nav } from "@/components/ui/nav";
 
 const ATS_LABEL: Record<Source, string> = {
   greenhouse: "Greenhouse",

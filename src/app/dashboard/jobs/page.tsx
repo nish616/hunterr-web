@@ -7,7 +7,7 @@ import { db, schema } from "@/lib/db";
 import type { Subscription } from "@/lib/db/schema";
 import { DEFAULT_SUBSCRIPTION } from "@/lib/db/schema";
 import { JobsClient } from "./jobs-client";
-import Nav from "@/components/ui/nav";
+import { Nav } from "@/components/ui/nav";
 
 export default async function JobsPage() {
   const session = await auth();

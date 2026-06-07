@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { loadCurrentProfile } from "@/lib/resume/profile";
 import { ResumeUploadForm } from "./upload-form";
-import Nav from "@/components/ui/nav";
+import { Nav } from "@/components/ui/nav";
 
 export default async function ResumePage() {
   const session = await auth();

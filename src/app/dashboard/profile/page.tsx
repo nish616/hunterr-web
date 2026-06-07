@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { UserPreferences } from "@/lib/db/schema";
 import { ProfileForm } from "./profile-form";
-import Nav from "@/components/ui/nav";
+import { Nav } from "@/components/ui/nav";
 
 
 export default async function ProfilePage() {

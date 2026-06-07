@@ -5,7 +5,7 @@ import { db, schema } from "@/lib/db";
 import type { Subscription, UserPreferences } from "@/lib/db/schema";
 import { DEFAULT_SUBSCRIPTION } from "@/lib/db/schema";
 import { DashboardClient } from "./dashboard-client";
-import Nav from "@/components/ui/nav";
+import { Nav } from "@/components/ui/nav";
 
 export default async function DashboardPage() {
   const session = await auth();
