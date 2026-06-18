@@ -32,9 +32,14 @@ function postedLabel(postedAt: string): string {
   if (!postedAt) return "—";
   const ts = Date.parse(postedAt);
   if (Number.isNaN(ts)) return "—";
-  const days = Math.floor((Date.now() - ts) / 86400000);
-  if (days <= 0) return "today";
-  if (days === 1) return "1d";
+  const diffMs = Date.now() - ts;
+  if (diffMs < 0) return "now"; // clock-skew safety
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d`;
   return `${Math.floor(days / 7)}w`;
 }

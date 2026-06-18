@@ -43,19 +43,19 @@ function parseList(text: string | undefined): string[] {
     .filter(Boolean);
 }
 
-/**
- * Relative "posted" label from an ISO date string. Returns "" for missing or
- * unparseable dates (some Ashby boards omit the field) so we render nothing.
- */
 function formatPosted(postedAt: string): string {
   if (!postedAt) return "";
   const ts = Date.parse(postedAt);
   if (Number.isNaN(ts)) return "";
 
   const diffMs = Date.now() - ts;
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (days <= 0) return "posted today";
+  if (diffMs < 0) return "posted just now"; // clock-skew safety
+  const mins = Math.floor(diffMs / (1000 * 60));
+  if (mins < 1) return "posted just now";
+  if (mins < 60) return `posted ${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `posted ${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
   if (days === 1) return "posted yesterday";
   if (days < 7) return `posted ${days} days ago`;
   if (days < 14) return "posted last week";
