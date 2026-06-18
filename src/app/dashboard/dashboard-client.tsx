@@ -125,7 +125,7 @@ export function DashboardClient({
   const [result, setResult] = useState<RunResult | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [progress, setProgress] = useState<ProgressState | null>(null);
-  const [aiEnabled, setAiEnabled] = useState<boolean>(isProUser);
+  const [aiEnabled, setAiEnabled] = useState<boolean>(false);
   const [selectedSources, setSelectedSources] = useState<Set<Source>>(
     () => new Set(ALL_SOURCES),
   );
