@@ -71,13 +71,13 @@ describe("filterAndRank — location matching", () => {
     expect(filterAndRank(jobs, baseFilters)).toHaveLength(3);
   });
 
-  it("keeps generic remote roles (when ALLOW_REMOTE is true)", () => {
+  it("does not keep generic remote roles (when ALLOW_REMOTE is true)", () => {
     const jobs = [
       makeJob({ location: "Remote" }),
       makeJob({ location: "Anywhere" }),
       makeJob({ location: "Worldwide" }),
     ];
-    expect(filterAndRank(jobs, baseFilters)).toHaveLength(3);
+    expect(filterAndRank(jobs, baseFilters)).toHaveLength(0);
   });
 
   it("drops Remote roles geofenced to a blocked region", () => {
