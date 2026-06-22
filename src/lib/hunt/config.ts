@@ -139,7 +139,7 @@ export const SKILL_KEYWORDS = [
   "aws",
 ];
 
-export const LOCATION_KEYWORDS = ["bengaluru", "bangalore", "hyderabad"];
+export const LOCATION_KEYWORDS = ["bengaluru", "bangalore", "hyderabad", "india"];
 
 export const ALLOW_REMOTE = true;
 
@@ -147,68 +147,8 @@ export const MIN_SKILL_MATCHES = 1;
 
 export const MAX_AGE_DAYS = 3;
 
-// Substrings that, when present alongside "remote", mean the role is geofenced
-// to a region that isn't India.
-export const BLOCKED_REMOTE_REGIONS = [
-  // Country names
-  "united states",
-  "usa",
-  "canada",
-  "mexico",
-  "united kingdom",
-  "germany",
-  "poland",
-  "ireland",
-  "netherlands",
-  "argentina",
-  "brazil",
-  "remote - us",
-  "remote-us",
-  "remote, us",
-  "us-remote",
-  "remote u.s.",
-  "us;",
-  " us:",
-  "; us",
-  ", us",
-  "remote - uk",
-  "remote-uk",
-  "remote, uk",
-  "uk-remote",
-  ", uk",
-  " uk:",
-  "; uk",
-  // Region terms
-  "emea",
-  "americas",
-  "north america",
-  "latam",
-  // US states / Canadian provinces
-  "california",
-  "colorado",
-  "illinois",
-  "new york",
-  "washington",
-  "massachusetts",
-  "texas",
-  "ontario",
-  "alberta",
-  "british columbia",
-  "san francisco",
-  "sf bay area",
-  "bay area",
-  "los angeles",
-  "new york city",
-  "nyc",
-  "boston",
-  "chicago",
-  "seattle",
-  "austin",
-  "denver",
-  "atlanta",
-  "london",
-  "manchester",
-  "edinburgh",
+export const ALLOWED_REMOTE_REGIONS = [
+  "india"
 ];
 
 export const AI_MAX_JOBS_PER_RUN = 80; // max jobs 

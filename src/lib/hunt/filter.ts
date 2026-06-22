@@ -3,7 +3,7 @@ import {
   ALLOW_REMOTE,
   MIN_SKILL_MATCHES,
   MAX_AGE_DAYS,
-  BLOCKED_REMOTE_REGIONS,
+  ALLOWED_REMOTE_REGIONS,
 } from "./config";
 import type { FilterOverrides, Job } from "./types";
 
@@ -21,12 +21,10 @@ function titleIsExcluded(title: string, excluded: string[]): boolean {
 function locationMatches(location: string): boolean {
   if (!location) return false;
   const loc = location.toLowerCase();
-  // India city / country match always wins.
   if (LOCATION_KEYWORDS.some((k) => loc.includes(k.toLowerCase()))) return true;
-  // Remote handling: only allow if it doesn't pin a non-India region.
   if (ALLOW_REMOTE && /remote|anywhere|worldwide/.test(loc)) {
-    if (BLOCKED_REMOTE_REGIONS.some((r) => loc.includes(r))) return false;
-    return true;
+    if (ALLOWED_REMOTE_REGIONS.some((r) => loc.includes(r))) return true;
+    return false;
   }
   return false;
 }
@@ -56,7 +54,6 @@ function isWithinAge(postedAt: string, maxAgeDays: number): boolean {
 }
 
 export function filterAndRank(jobs: Job[], overrides?: FilterOverrides): Job[] {
-  // Titles and skills are user-configured and required — no config fallback.
   const roleKeywords = overrides?.roles ?? [];
   const skillKeywords = overrides?.skills ?? [];
   const excludedTitles = overrides?.excludeTitles ?? [];

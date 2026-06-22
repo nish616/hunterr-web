@@ -8,13 +8,9 @@ export type Verdict = "strong" | "good" | "stretch" | "skip";
  * Empty / undefined fields fall back to the defaults in config.ts.
  */
 export interface FilterOverrides {
-  /** Replaces ROLE_KEYWORDS — title must contain at least one of these. */
   roles?: string[];
-  /** New filter — title must NOT contain any of these (e.g. "java", "staff"). */
   excludeTitles?: string[];
-  /** Replaces SKILL_KEYWORDS — used for keyword scoring. */
   skills?: string[];
-  /** Max posting age in days; 0 = no limit. Overrides MAX_AGE_DAYS. */
   maxAgeDays?: number;
 }
 

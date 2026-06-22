@@ -2,18 +2,6 @@ import { describe, it, expect } from "vitest";
 import { filterAndRank } from "./filter";
 import type { Job, FilterOverrides } from "./types";
 
-/**
- * Tests for filterAndRank() — the deterministic pre-filter that decides
- * which fetched jobs go into the AI scoring pool. Bugs here either let
- * the wrong roles through (wasted AI spend) or filter out good matches
- * (silent loss of jobs). Both are bad.
- *
- * The function uses real config constants (LOCATION_KEYWORDS, ALLOW_REMOTE,
- * MIN_SKILL_MATCHES, MAX_AGE_DAYS, BLOCKED_REMOTE_REGIONS). The fixtures
- * below are written against those values; if config changes, expect a few
- * of these to need updating.
- */
-
 // Fixture factory — builds a Job with sensible defaults you can override.
 function makeJob(overrides: Partial<Job> = {}): Job {
   return {
