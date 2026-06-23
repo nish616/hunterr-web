@@ -1,10 +1,9 @@
-import { auth, signOut } from "@/auth";
-import { Button } from "@/components/ui/button";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import type { UserPreferences } from "@/lib/db/schema";
+import type { Subscription, UserPreferences } from "@/lib/db/schema";
+import { DEFAULT_SUBSCRIPTION } from "@/lib/db/schema";
 import { ProfileForm } from "./profile-form";
 import { Nav } from "@/components/ui/nav";
 
@@ -15,9 +14,10 @@ export default async function ProfilePage() {
 
   const row = await db.query.users.findFirst({
     where: eq(schema.users.id, session.user.id),
-    columns: { preferences: true },
+    columns: { preferences: true, subscription: true },
   });
   const preferences: UserPreferences = row?.preferences ?? {};
+  const subscription: Subscription = row?.subscription ?? DEFAULT_SUBSCRIPTION;
 
   return (
     <main className="flex-1">
@@ -32,7 +32,11 @@ export default async function ProfilePage() {
           scored. Leave a field empty to fall back to the built-in defaults.
         </p>
 
-        <ProfileForm preferences={preferences} />
+        <ProfileForm
+          preferences={preferences}
+          subscription={subscription}
+          userEmail={session.user.email ?? ""}
+        />
       </section>
     </main>
   );
