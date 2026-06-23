@@ -25,7 +25,28 @@ export interface UserPreferences {
   linkedinUrl?: string;
   githubUrl?: string;
   portfolioUrl?: string;
+  autoRunEnabled?: boolean;
+  alertFrequencyHours?: number; // 1, 2, 4, 6, 12, 24
+  alertStartHour?: number; // 0-23, in alertTimezone
+  alertEndHour?: number; // 0-23, in alertTimezone (exclusive)
+  alertTimezone?: string; // IANA TZ, e.g. "Asia/Kolkata"
+
+  // Internal state — written by the cron, NOT user-editable.
+  lastAlertSentAt?: string; // ISO timestamp
 }
+
+// Defaults applied when a user enables auto-run for the first time.
+export const DEFAULT_AUTO_RUN: Required<
+  Pick<
+    UserPreferences,
+    "alertFrequencyHours" | "alertStartHour" | "alertEndHour" | "alertTimezone"
+  >
+> = {
+  alertFrequencyHours: 4,
+  alertStartHour: 9,
+  alertEndHour: 21,
+  alertTimezone: "Asia/Kolkata",
+};
 
 export const users = pgTable("users", {
   id: text("id")
