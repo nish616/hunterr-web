@@ -53,9 +53,9 @@ const SHOTS: {
   },
   {
     src: "/screenshots/companies.png",
-    alt: "Companies tracked, 85 companies across three ATS platforms",
+    alt: "Companies tracked, 93 companies across three ATS platforms",
     tag: "Companies",
-    caption: "85 companies tracked",
+    caption: "93 companies tracked",
     sub: "Across Greenhouse, Lever and Ashby, tagged by ATS and India-HQ.",
   },
   {
@@ -91,7 +91,7 @@ export default function LandingPage() {
           Hunterr
         </h1>
         <p className="text-lg md:text-2xl text-muted-foreground mb-10 leading-relaxed">
-          An AI job-discovery agent. Scans 85 company job boards, ranks roles
+          An AI job-discovery agent. Scans 93 company job boards, ranks roles
           against your resume with Claude.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">

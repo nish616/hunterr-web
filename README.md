@@ -2,7 +2,7 @@
 
 An invite-only job-discovery system that combines an **AI workflow** for bulk
 crawling/scoring with an **agentic** deep dive for high-touch per-job analysis.
-Scans 85 company job boards, scores them against your resume, and on demand
+Scans 93 company job boards, scores them against your resume, and on demand
 runs a Claude agent that researches the company, gap-analyses you against the
 JD, rewrites your resume bullets to fit, and drafts both a tailored cover
 letter and interview-prep questions.

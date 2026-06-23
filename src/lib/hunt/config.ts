@@ -50,6 +50,8 @@ const BASE_ATS_CONFIG = {
     "gomotive",
     "ibkr",
     "singlestore",
+    // Schrödinger Inc.'s actual Greenhouse slug — looks like a typo but it's
+    // not. "schrodinger" 404s; "schrdinger" returns jobs. Don't "fix" it.
     "schrdinger",
     "degreed",
   ],
@@ -71,6 +73,8 @@ const BASE_ATS_CONFIG = {
     "turvo",
     "elfbeauty",
     "moonpay",
+    // Sprinto's Lever slug is case-sensitive - lowercase "sprinto" 404s.
+    // Don't lowercase this even if it looks inconsistent with the others.
     "Sprinto",
     "meesho",
     "mindtickle",
@@ -90,8 +94,10 @@ const BASE_ATS_CONFIG = {
     "notion",
     "openai",
     "harvey",
-    "Almabase",
+    "almabase",
     "office-hours",
+    // Flagright's Ashby slug includes the .com suffix - without it 404s.
+    // Don't strip the .com.
     "flagright.com",
     "ontologize",
     "astronomer",
