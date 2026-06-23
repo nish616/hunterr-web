@@ -19,7 +19,8 @@ export async function GET(req: Request) {
       { status: 500 },
     );
   }
-  if (req.headers.get("authorization") !== `Bearer ${expected}`) {
+  console.log("Req Headers", req.headers);
+  if (req.headers.get("Authorization") !== `Bearer ${expected}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
