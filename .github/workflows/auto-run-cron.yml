@@ -20,6 +20,7 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           ENDPOINT: https://hunterr.nishins.dev/api/cron/auto-run
         run: |
+          echo ${CRON_SECRET}
           set +e
           RESPONSE=$(curl --silent --show-error --max-time 90 \
             --write-out '\n__HTTP_STATUS__:%{http_code}' \
