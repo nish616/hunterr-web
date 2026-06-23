@@ -1,0 +1,135 @@
+import { NextResponse } from "next/server";
+import { db, schema } from "@/lib/db";
+import { runHunt } from "@/lib/hunt/pipeline";
+import { isPro } from "@/lib/subscription";
+import { DEFAULT_AUTO_RUN } from "@/lib/db/schema";
+import { isAlertDue, diffNewJobs } from "@/lib/auto-run";
+import type { FilterOverrides } from "@/lib/hunt/types";
+import { Tier } from "@/lib/constants";
+
+export const maxDuration = 60;
+
+const MAX_USERS_PER_TICK = 10;
+
+export async function GET(req: Request) {
+  const expected = process.env.CRON_SECRET;
+  if (!expected) {
+    return NextResponse.json(
+      { error: "CRON_SECRET is not configured" },
+      { status: 500 },
+    );
+  }
+  if (req.headers.get("authorization") !== `Bearer ${expected}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const startedAt = Date.now();
+  const decisions: Array<{
+    userId: string;
+    email: string;
+    jobs: number;
+    wouldAlert: boolean;
+    reason: string;
+  }> = [];
+  const errors: Array<{ userId: string; error: string }> = [];
+
+  const users = await db.query.users.findMany({
+    columns: { id: true, email: true, preferences: true, subscription: true },
+  });
+
+  const eligible = users
+    .filter((u) => isPro(u.subscription?.tier ?? Tier.Free))
+    .filter((u) => u.preferences?.autoRunEnabled === true)
+    .slice(0, MAX_USERS_PER_TICK);
+
+  await Promise.all(
+    eligible.map(async (user) => {
+      try {
+        const prefs = user.preferences ?? {};
+        const filters: FilterOverrides = {
+          roles: parseList(prefs.preferredTitles),
+          excludeTitles: parseList(prefs.excludedTitles),
+          skills: parseList(prefs.skills),
+          maxAgeDays: prefs.maxAgeDays,
+        };
+
+        if (filters.roles!.length === 0 || filters.skills!.length === 0) {
+          decisions.push({
+            userId: user.id,
+            email: user.email,
+            jobs: 0,
+            wouldAlert: false,
+            reason: "missing titles or skills in profile",
+          });
+          return;
+        }
+
+        const result = await runHunt({
+          userId: user.id,
+          withAi: false,
+          filters,
+        });
+
+        const currentUrls = result.jobs
+          .map((j) => j.url)
+          .filter((u): u is string => Boolean(u));
+
+        const schedulePrefs = {
+          alertFrequencyHours:
+            prefs.alertFrequencyHours ?? DEFAULT_AUTO_RUN.alertFrequencyHours,
+          alertStartHour:
+            prefs.alertStartHour ?? DEFAULT_AUTO_RUN.alertStartHour,
+          alertEndHour: prefs.alertEndHour ?? DEFAULT_AUTO_RUN.alertEndHour,
+          alertTimezone: prefs.alertTimezone ?? DEFAULT_AUTO_RUN.alertTimezone,
+          lastAlertSentAt: prefs.lastAlertSentAt,
+        };
+
+        let wouldAlert = false;
+        let reason: string;
+        if (currentUrls.length === 0) {
+          reason = "no new jobs since last alert";
+        } else if (!isAlertDue(schedulePrefs)) {
+          reason = "outside window or interval not elapsed";
+        } else {
+          wouldAlert = true;
+          reason = `${currentUrls.length} new job(s)`;
+        }
+
+        decisions.push({
+          userId: user.id,
+          email: user.email,
+          jobs: currentUrls.length,
+          wouldAlert,
+          reason,
+        });
+      } catch (err) {
+        errors.push({
+          userId: user.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }),
+  );
+
+  const summary = {
+    event: "auto_run_tick",
+    durationMs: Date.now() - startedAt,
+    totalUsers: users.length,
+    eligibleUsers: eligible.length,
+    wouldAlert: decisions.filter((d) => d.wouldAlert).length,
+    decisions,
+    errors,
+  };
+
+  console.log(JSON.stringify(summary));
+
+  return NextResponse.json(summary);
+}
+
+function parseList(text: string | undefined): string[] {
+  if (!text) return [];
+  return text
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}

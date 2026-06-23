@@ -1,0 +1,45 @@
+name: Auto-run cron
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: auto-run-cron
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Trigger auto-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: POST to /api/cron/auto-run
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          ENDPOINT: https://hunterr.nishins.dev/api/cron/auto-run
+        run: |
+          set +e
+          RESPONSE=$(curl --silent --show-error --max-time 90 \
+            --write-out '\n__HTTP_STATUS__:%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${ENDPOINT}")
+          CURL_EXIT=$?
+          set -e
+
+          STATUS=$(echo "$RESPONSE" | grep -o '__HTTP_STATUS__:[0-9]*' | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | sed '/__HTTP_STATUS__:/d')
+
+          echo "::group::Response (HTTP ${STATUS:-?})"
+          echo "$BODY" | jq '.' 2>/dev/null || echo "$BODY"
+          echo "::endgroup::"
+
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "::error::curl failed with exit code ${CURL_EXIT}"
+            exit "$CURL_EXIT"
+          fi
+          if [ "${STATUS:-0}" -ge 400 ]; then
+            echo "::error::Cron endpoint returned HTTP ${STATUS}"
+            exit 1
+          fi

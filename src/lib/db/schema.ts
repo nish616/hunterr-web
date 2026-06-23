@@ -33,7 +33,6 @@ export interface UserPreferences {
 
   // Internal state — written by the cron, NOT user-editable.
   lastAlertSentAt?: string; // ISO timestamp
-  lastAlertJobUrls?: string[]; // for "new since last alert" diffing
 }
 
 // Defaults applied when a user enables auto-run for the first time.
