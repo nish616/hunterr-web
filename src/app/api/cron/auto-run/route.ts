@@ -25,10 +25,11 @@ export async function GET(req: Request) {
   }
 
   const startedAt = Date.now();
-  const decisions: Array<{
+  const jobs: Array<{
     userId: string;
     email: string;
-    jobs: number;
+    length: number;
+    details: Array<Object>
     wouldAlert: boolean;
     reason: string;
   }> = [];
@@ -55,10 +56,11 @@ export async function GET(req: Request) {
         };
 
         if (filters.roles!.length === 0 || filters.skills!.length === 0) {
-          decisions.push({
+          jobs.push({
             userId: user.id,
             email: user.email,
-            jobs: 0,
+            length: 0,
+            details: [],
             wouldAlert: false,
             reason: "missing titles or skills in profile",
           });
@@ -96,10 +98,11 @@ export async function GET(req: Request) {
           reason = `${currentUrls.length} new job(s)`;
         }
 
-        decisions.push({
+        jobs.push({
           userId: user.id,
           email: user.email,
-          jobs: currentUrls.length,
+          length: currentUrls.length,
+          details: currentUrls,
           wouldAlert,
           reason,
         });
@@ -117,8 +120,8 @@ export async function GET(req: Request) {
     durationMs: Date.now() - startedAt,
     totalUsers: users.length,
     eligibleUsers: eligible.length,
-    wouldAlert: decisions.filter((d) => d.wouldAlert).length,
-    decisions,
+    wouldAlert: jobs.filter((d) => d.wouldAlert).length,
+    jobs,
     errors,
   };
 
