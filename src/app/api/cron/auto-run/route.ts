@@ -73,9 +73,16 @@ export async function GET(req: Request) {
           filters,
         });
 
-        const currentUrls = result.jobs
-          .map((j) => j.url)
-          .filter((u): u is string => Boolean(u));
+        const jobDetails = result.jobs
+          .map((j) => {
+            const {title, company, postedAt, location, url} = j;
+            return {
+              title,
+              company,
+              postedAt,
+              location
+            }
+          });
 
         const schedulePrefs = {
           alertFrequencyHours:
@@ -89,20 +96,20 @@ export async function GET(req: Request) {
 
         let wouldAlert = false;
         let reason: string;
-        if (currentUrls.length === 0) {
+        if (jobDetails.length === 0) {
           reason = "no new jobs since last alert";
         } else if (!isAlertDue(schedulePrefs)) {
           reason = "outside window or interval not elapsed";
         } else {
           wouldAlert = true;
-          reason = `${currentUrls.length} new job(s)`;
+          reason = `${jobDetails.length} new job(s)`;
         }
 
         jobs.push({
           userId: user.id,
           email: user.email,
-          length: currentUrls.length,
-          details: currentUrls,
+          length: jobDetails.length,
+          details: jobDetails,
           wouldAlert,
           reason,
         });
