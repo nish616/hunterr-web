@@ -23,17 +23,11 @@ function JobCard({ job }: { job: Job }) {
 }
 
 export function JobAlertEmail({ jobs }: { jobs: Job[] }) {
-  const today = new Date();
 
-  const formattedDate = [
-    String(today.getDate()).padStart(2, "0"),
-    String(today.getMonth() + 1).padStart(2, "0"),
-    today.getFullYear(),
-  ].join("-");
 
   return (
     <div>
-      <h1>Job Alerts {formattedDate}</h1>
+      <h1>Jobs</h1>
 
       {jobs.map((job) => (
         <JobCard job={job} />
