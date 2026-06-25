@@ -6,7 +6,7 @@ import { DEFAULT_AUTO_RUN } from "@/lib/db/schema";
 import { isAlertDue, diffNewJobs } from "@/lib/auto-run";
 import type { FilterOverrides } from "@/lib/hunt/types";
 import { Tier } from "@/lib/constants";
-import { resend } from "@/lib/resend";
+import { getResendClient } from "@/lib/resend";
 import { JobAlertEmail } from "@/components/ui/jobEmail";
 import { Job } from "@/types/job";
 
@@ -139,6 +139,8 @@ export async function GET(req: Request) {
     if (!alert.jobs.length) continue;
     
     console.log("Sending mail....");
+
+    const resend = getResendClient();
     
     const { data, error } = await resend.emails.send({
       from: "hunterr-alerts@hunterr.nishins.dev",
