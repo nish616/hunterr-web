@@ -6,6 +6,9 @@ import { DEFAULT_AUTO_RUN } from "@/lib/db/schema";
 import { isAlertDue, diffNewJobs } from "@/lib/auto-run";
 import type { FilterOverrides } from "@/lib/hunt/types";
 import { Tier } from "@/lib/constants";
+import { resend } from "@/lib/resend";
+import { JobAlertEmail } from "@/components/ui/jobEmail";
+import { Job } from "@/types/job";
 
 export const maxDuration = 60;
 
@@ -25,11 +28,11 @@ export async function GET(req: Request) {
   }
 
   const startedAt = Date.now();
-  const jobs: Array<{
+  const alerts: Array<{
     userId: string;
     email: string;
     length: number;
-    details: Array<Object>
+    jobs: Job[];
     wouldAlert: boolean;
     reason: string;
   }> = [];
@@ -56,11 +59,11 @@ export async function GET(req: Request) {
         };
 
         if (filters.roles!.length === 0 || filters.skills!.length === 0) {
-          jobs.push({
+          alerts.push({
             userId: user.id,
             email: user.email,
             length: 0,
-            details: [],
+            jobs: [],
             wouldAlert: false,
             reason: "missing titles or skills in profile",
           });
@@ -73,9 +76,9 @@ export async function GET(req: Request) {
           filters,
         });
 
-        const jobDetails = result.jobs
+        const jobs = result.jobs
           .map((j) => {
-            const {title, company, postedAt, location, url} = j;
+            const { title, company, postedAt, location, url } = j;
             return {
               title,
               company,
@@ -96,20 +99,20 @@ export async function GET(req: Request) {
 
         let wouldAlert = false;
         let reason: string;
-        if (jobDetails.length === 0) {
+        if (jobs.length === 0) {
           reason = "no new jobs since last alert";
         } else if (!isAlertDue(schedulePrefs)) {
           reason = "outside window or interval not elapsed";
         } else {
           wouldAlert = true;
-          reason = `${jobDetails.length} new job(s)`;
+          reason = `${jobs.length} new job(s)`;
         }
 
-        jobs.push({
+        alerts.push({
           userId: user.id,
           email: user.email,
-          length: jobDetails.length,
-          details: jobDetails,
+          length: jobs.length,
+          jobs: jobs,
           wouldAlert,
           reason,
         });
@@ -127,12 +130,27 @@ export async function GET(req: Request) {
     durationMs: Date.now() - startedAt,
     totalUsers: users.length,
     eligibleUsers: eligible.length,
-    wouldAlert: jobs.filter((d) => d.wouldAlert).length,
-    jobs,
+    wouldAlert: alerts.filter((d) => d.wouldAlert).length,
+    alerts,
     errors,
   };
 
-  console.log(JSON.stringify(summary));
+  for (const alert of alerts) {
+    if (!alert.jobs.length) continue;
+    
+    console.log("Sending mail....");
+    
+    const { data, error } = await resend.emails.send({
+      from: "hunterr-alerts@hunterr.nishins.dev",
+      to: alert.email,
+      subject: "Job Alert",
+      react: JobAlertEmail({ jobs: alert.jobs })
+    });
+    if (error) {
+      console.error("Error in sending email", error);
+      return;
+    }
+  }
 
   return NextResponse.json(summary);
 }
