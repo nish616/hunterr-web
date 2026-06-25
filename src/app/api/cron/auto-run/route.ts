@@ -7,7 +7,7 @@ import { isAlertDue, diffNewJobs } from "@/lib/auto-run";
 import type { FilterOverrides } from "@/lib/hunt/types";
 import { Tier } from "@/lib/constants";
 import { getResendClient } from "@/lib/resend";
-import { JobAlertEmail } from "@/components/ui/jobEmail";
+import { JobAlertEmail } from "@/components/emails/jobAlertEmail";
 import { Job } from "@/types/job";
 
 export const maxDuration = 60;
@@ -83,7 +83,8 @@ export async function GET(req: Request) {
               title,
               company,
               postedAt,
-              location
+              location,
+              url
             }
           });
 
