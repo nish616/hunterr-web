@@ -151,15 +151,19 @@ export async function GET(req: Request) {
       today.getFullYear(),
     ].join("-");
 
+    const subject = `Job Alert ${formattedDate}`;
+
+    console.log("Email subject", subject);
+
     const { data, error } = await resend.emails.send({
       from: "hunterr-alerts@hunterr.nishins.dev",
       to: alert.email,
-      subject: `Job Alert ${formattedDate}`,
+      subject: subject,
       react: JobAlertEmail({ jobs: alert.jobs })
     });
     if (error) {
       console.error("Error in sending email", error);
-      return;
+      continue;
     }
   }
 
