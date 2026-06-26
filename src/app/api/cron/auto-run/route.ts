@@ -138,20 +138,32 @@ export async function GET(req: Request) {
 
   for (const alert of alerts) {
     if (!alert.jobs.length) continue;
-    
+
     console.log("Sending mail....");
 
     const resend = getResendClient();
-    
+
+    const today = new Date();
+
+    const formattedDate = [
+      String(today.getDate()).padStart(2, "0"),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      today.getFullYear(),
+    ].join("-");
+
+    const subject = `Job Alert ${formattedDate}`;
+
+    console.log("Email subject", subject);
+
     const { data, error } = await resend.emails.send({
       from: "hunterr-alerts@hunterr.nishins.dev",
       to: alert.email,
-      subject: "Job Alert",
+      subject: subject,
       react: JobAlertEmail({ jobs: alert.jobs })
     });
     if (error) {
       console.error("Error in sending email", error);
-      return;
+      continue;
     }
   }
 

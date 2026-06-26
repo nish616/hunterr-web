@@ -23,9 +23,11 @@ function JobCard({ job }: { job: Job }) {
 }
 
 export function JobAlertEmail({ jobs }: { jobs: Job[] }) {
+
+
   return (
     <div>
-      <h1>New Jobs Found</h1>
+      <h1>Jobs</h1>
 
       {jobs.map((job) => (
         <JobCard job={job} />
