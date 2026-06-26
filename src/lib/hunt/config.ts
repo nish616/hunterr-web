@@ -54,6 +54,7 @@ const BASE_ATS_CONFIG = {
     // not. "schrodinger" 404s; "schrdinger" returns jobs. Don't "fix" it.
     "schrdinger",
     "degreed",
+    "earnin",
   ],
   lever: [
     "cred",
