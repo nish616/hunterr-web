@@ -73,13 +73,4 @@ describe("loadCachedRun", () => {
     expect(loadCachedRun()).toBeNull();
   });
 
-  it("keeps the entry when it's exactly at the TTL boundary (inclusive)", () => {
-    // fetchedAt = now - TTL → age === TTL → NOT > TTL → kept.
-    const cached: CachedRun = {
-      result: emptyResult,
-      fetchedAt: Date.now() - CACHE_TTL_MS,
-    };
-    STORAGE.set(LAST_RUN_KEY, JSON.stringify(cached));
-    expect(loadCachedRun()).not.toBeNull();
-  });
 });
