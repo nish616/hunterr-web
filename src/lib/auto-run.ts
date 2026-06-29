@@ -1,3 +1,5 @@
+import { Job } from "@/types/job";
+
 export function getCurrentHourInTz(tz: string, now: Date = new Date()): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: tz,
@@ -50,10 +52,10 @@ export function isAlertDue(
 }
 
 export function diffNewJobs(
-  current: readonly string[],
+  current: readonly Job[],
   seenUrls: readonly string[],
-): string[] {
+): Job[] {
   if (seenUrls.length === 0) return [...current];
   const seen = new Set(seenUrls);
-  return current.filter((u) => !seen.has(u));
+  return current.filter((u) => !seen.has(u.url));
 }
