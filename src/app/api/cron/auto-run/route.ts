@@ -101,8 +101,7 @@ export async function GET(req: Request) {
           lastAlert: prefs.lastAlert
         };
 
-        const newUrls = jobs.map(x => x.url);
-        const newJobs = diffNewJobs(jobs, newUrls);
+        const newJobs = diffNewJobs(jobs, prefs.lastAlert ?? []);
 
         let wouldAlert = false;
         let reason: string;
@@ -112,7 +111,7 @@ export async function GET(req: Request) {
           reason = "outside window or interval not elapsed";
         } else {
           wouldAlert = true;
-          reason = `${jobs.length} new job(s)`;
+          reason = `${newJobs.length} new job(s)`;
         }
 
         alerts.push({

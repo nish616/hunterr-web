@@ -6,6 +6,7 @@ import {
   isAlertDue,
   diffNewJobs,
 } from "./auto-run";
+import type { Job } from "@/types/job";
 
 
 describe("getCurrentHourInTz", () => {
@@ -126,19 +127,38 @@ describe("isAlertDue (composite)", () => {
 });
 
 describe("diffNewJobs", () => {
-  it("returns all current URLs when seen is empty", () => {
-    expect(diffNewJobs(["a", "b", "c"], [])).toEqual(["a", "b", "c"]);
+  const job = (url: string): Job => ({
+    title: `Job ${url}`,
+    company: "Acme",
+    location: "Remote",
+    postedAt: "2026-06-23",
+    url,
+  });
+  const urls = (jobs: Job[]) => jobs.map((j) => j.url);
+
+  it("returns all current jobs when seen is empty", () => {
+    expect(urls(diffNewJobs([job("a"), job("b"), job("c")], []))).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
   });
 
-  it("filters out URLs already in the seen set", () => {
-    expect(diffNewJobs(["a", "b", "c"], ["b"])).toEqual(["a", "c"]);
+  it("filters out jobs whose URL is already in the seen set", () => {
+    expect(urls(diffNewJobs([job("a"), job("b"), job("c")], ["b"]))).toEqual([
+      "a",
+      "c",
+    ]);
   });
 
-  it("returns an empty array when everything has been seen", () => {
-    expect(diffNewJobs(["a", "b"], ["a", "b", "c"])).toEqual([]);
+  it("returns an empty array when every URL has been seen", () => {
+    expect(diffNewJobs([job("a"), job("b")], ["a", "b", "c"])).toEqual([]);
   });
 
   it("preserves the order of `current`", () => {
-    expect(diffNewJobs(["c", "a", "b"], ["a"])).toEqual(["c", "b"]);
+    expect(urls(diffNewJobs([job("c"), job("a"), job("b")], ["a"]))).toEqual([
+      "c",
+      "b",
+    ]);
   });
 });
