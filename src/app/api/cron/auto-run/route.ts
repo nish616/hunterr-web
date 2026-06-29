@@ -9,10 +9,20 @@ import { Tier } from "@/lib/constants";
 import { getResendClient } from "@/lib/resend";
 import { JobAlertEmail } from "@/components/emails/jobAlertEmail";
 import { Job } from "@/types/job";
+import { eq } from "drizzle-orm";
 
 export const maxDuration = 60;
 
 const MAX_USERS_PER_TICK = 10;
+
+type Alert = {
+  userId: string,
+  email: string,
+  length: number,
+  jobs: Job[],
+  wouldAlert: boolean,
+  reason: string,
+}
 
 export async function GET(req: Request) {
   const expected = process.env.CRON_SECRET;
@@ -22,20 +32,12 @@ export async function GET(req: Request) {
       { status: 500 },
     );
   }
-  console.log("Req Headers", req.headers);
   if (req.headers.get("Authorization") !== `Bearer ${expected}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const startedAt = Date.now();
-  const alerts: Array<{
-    userId: string;
-    email: string;
-    length: number;
-    jobs: Job[];
-    wouldAlert: boolean;
-    reason: string;
-  }> = [];
+  const alerts: Array<Alert> = [];
   const errors: Array<{ userId: string; error: string }> = [];
 
   const users = await db.query.users.findMany({
@@ -96,11 +98,15 @@ export async function GET(req: Request) {
           alertEndHour: prefs.alertEndHour ?? DEFAULT_AUTO_RUN.alertEndHour,
           alertTimezone: prefs.alertTimezone ?? DEFAULT_AUTO_RUN.alertTimezone,
           lastAlertSentAt: prefs.lastAlertSentAt,
+          lastAlert: prefs.lastAlert
         };
+
+        const newUrls = jobs.map(x => x.url);
+        const newJobs = diffNewJobs(jobs, newUrls);
 
         let wouldAlert = false;
         let reason: string;
-        if (jobs.length === 0) {
+        if (newJobs.length === 0) {
           reason = "no new jobs since last alert";
         } else if (!isAlertDue(schedulePrefs)) {
           reason = "outside window or interval not elapsed";
@@ -112,8 +118,8 @@ export async function GET(req: Request) {
         alerts.push({
           userId: user.id,
           email: user.email,
-          length: jobs.length,
-          jobs: jobs,
+          length: newJobs.length,
+          jobs: newJobs,
           wouldAlert,
           reason,
         });
@@ -167,6 +173,10 @@ export async function GET(req: Request) {
     }
   }
 
+  await presistLastAlertDetails(alerts);
+
+  console.log("Auto run summary: ", summary);
+
   return NextResponse.json(summary);
 }
 
@@ -176,4 +186,31 @@ function parseList(text: string | undefined): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+async function presistLastAlertDetails(alerts: Alert[]) {
+  try {
+    for (const alert of alerts) {
+      const user = await db.query.users.findFirst({
+        where: eq(schema.users.id, alert.userId),
+        columns: { preferences: true },
+      });
+
+      const prefrences = user?.preferences || {};
+
+      prefrences.lastAlert = alert.jobs.map(x => x.url);
+      prefrences.lastAlertSentAt = new Date().toISOString();
+
+
+      await db
+        .update(schema.users)
+        .set({ preferences: prefrences })
+        .where(eq(schema.users.id, alert.userId));
+    }
+
+  } catch (Err) {
+    console.error("Error update alert")
+    return;
+  }
+
 }
