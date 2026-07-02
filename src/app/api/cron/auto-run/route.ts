@@ -20,6 +20,7 @@ type Alert = {
   email: string,
   length: number,
   jobs: Job[],
+  newJobs: Job[],
   wouldAlert: boolean,
   reason: string,
 }
@@ -66,6 +67,7 @@ export async function GET(req: Request) {
             email: user.email,
             length: 0,
             jobs: [],
+            newJobs: [],
             wouldAlert: false,
             reason: "missing titles or skills in profile",
           });
@@ -118,7 +120,8 @@ export async function GET(req: Request) {
           userId: user.id,
           email: user.email,
           length: newJobs.length,
-          jobs: newJobs,
+          jobs: jobs,
+          newJobs: newJobs,
           wouldAlert,
           reason,
         });
@@ -142,7 +145,7 @@ export async function GET(req: Request) {
   };
 
   for (const alert of alerts) {
-    if (!alert.jobs.length) continue;
+    if (!alert.newJobs.length) continue;
 
     console.log("Sending mail....");
 
@@ -158,13 +161,11 @@ export async function GET(req: Request) {
 
     const subject = `Job Alert ${formattedDate}`;
 
-    console.log("Email subject", subject);
-
     const { data, error } = await resend.emails.send({
       from: "hunterr-alerts@hunterr.nishins.dev",
       to: alert.email,
       subject: subject,
-      react: JobAlertEmail({ jobs: alert.jobs })
+      react: JobAlertEmail({ jobs: alert.newJobs })
     });
     if (error) {
       console.error("Error in sending email", error);
