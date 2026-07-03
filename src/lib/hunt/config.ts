@@ -84,6 +84,7 @@ const BASE_ATS_CONFIG = {
     "hevodata",
     "smart-working-solutions",
     "binance",
+    "jumpcloud",
   ],
   ashby: [
     "linear",
