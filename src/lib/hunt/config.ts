@@ -85,6 +85,7 @@ const BASE_ATS_CONFIG = {
     "smart-working-solutions",
     "binance",
     "jumpcloud",
+    "netomi",
   ],
   ashby: [
     "linear",
